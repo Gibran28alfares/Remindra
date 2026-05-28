@@ -4,9 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Activity,
+  Bell,
   Clipboard,
+  Cloud,
+  Database,
   FileDown,
   Gauge,
+  LogOut,
   MessageSquareText,
   RefreshCw,
   Save,
@@ -233,56 +238,71 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#eef3f8]">
-      <header className="border-b border-line bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-brand">REMINDRA</p>
-            <h1 className="text-2xl font-bold tracking-normal text-ink">Retensi Konsumen & Follow-up AHASS</h1>
+    <main className="min-h-screen bg-slate-100 text-ink">
+      <header className="sticky top-0 z-20 border-b border-line/80 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between lg:px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand text-white shadow-sm">
+              <Activity size={22} />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl font-bold tracking-normal text-ink md:text-2xl">REMINDRA</h1>
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Cloud v1</span>
+              </div>
+              <p className="mt-0.5 text-sm text-slate-500">Retensi konsumen, Hotline Order, WO checklist, dan reminder AHASS.</p>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button className="focus-ring inline-flex items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold" onClick={loadData}>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill icon={<Cloud size={14} />} label="Supabase" value="Online" />
+            <button className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" onClick={loadData}>
               <RefreshCw size={16} />
               Refresh
             </button>
-            <button className="focus-ring rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold" onClick={signOut}>
+            <button className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" onClick={signOut}>
+              <LogOut size={16} />
               Keluar
             </button>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl gap-4 px-4 py-5">
-        {feedback ? <div className="rounded-md border border-brand/30 bg-brand/10 px-4 py-3 text-sm font-medium text-ink">{feedback}</div> : null}
+      <div className="mx-auto grid max-w-[1440px] gap-5 px-4 py-5 lg:px-6">
+        {feedback ? (
+          <div className="rounded-md border border-brand/20 bg-white px-4 py-3 text-sm font-medium text-ink shadow-sm">
+            <span className="mr-2 inline-flex h-2 w-2 rounded-full bg-brand" />
+            {feedback}
+          </div>
+        ) : null}
 
         <section className="grid gap-3 md:grid-cols-5">
-          <Metric icon={<Gauge size={18} />} label="HO aktif" value={String(metrics.activeHotlines)} />
-          <Metric icon={<MessageSquareText size={18} />} label="Reminder pending" value={String(metrics.pendingReminders)} />
-          <Metric icon={<Clipboard size={18} />} label="Follow-up/copy" value={String(metrics.followedUp)} />
-          <Metric icon={<Gauge size={18} />} label="Konversi" value={`${metrics.conversionRate}%`} />
-          <Metric icon={<FileDown size={18} />} label="Estimasi omzet" value={formatCurrency(metrics.savedRevenue)} />
+          <Metric icon={<Database size={18} />} label="HO aktif" value={String(metrics.activeHotlines)} tone="brand" />
+          <Metric icon={<Bell size={18} />} label="Reminder pending" value={String(metrics.pendingReminders)} tone="amber" />
+          <Metric icon={<Clipboard size={18} />} label="Follow-up/copy" value={String(metrics.followedUp)} tone="slate" />
+          <Metric icon={<Gauge size={18} />} label="Konversi" value={`${metrics.conversionRate}%`} tone="blue" />
+          <Metric icon={<FileDown size={18} />} label="Estimasi omzet" value={formatCurrency(metrics.savedRevenue)} tone="green" />
         </section>
 
         <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
           <Panel title="Parser Hotline Order" icon={<Clipboard size={18} />}>
             <div className="grid gap-3">
               <textarea
-                className="focus-ring min-h-36 rounded-md border border-line bg-white p-3 text-sm"
+                className="focus-ring min-h-40 rounded-md border border-line bg-slate-50 p-3 text-sm leading-6 shadow-inner placeholder:text-slate-400"
                 placeholder="Paste teks Portal HO di sini..."
                 value={rawPortalText}
                 onChange={(event) => setRawPortalText(event.target.value)}
               />
               <div className="flex flex-wrap gap-2">
-                <button className="focus-ring inline-flex items-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-60" onClick={parseHotline} disabled={parserLoading}>
+                <button className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60" onClick={parseHotline} disabled={parserLoading}>
                   <Clipboard size={16} />
                   {parserLoading ? "Memproses..." : "Proses Data"}
                 </button>
-                <button className="focus-ring rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold" onClick={() => setParsedHotlines([emptyParsedHotline()])}>
+                <button className="focus-ring min-h-10 rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" onClick={() => setParsedHotlines([emptyParsedHotline()])}>
                   Input Manual
                 </button>
               </div>
               {parserWarnings.length ? (
-                <div className="rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-ink">
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
                   <p className="font-semibold">Catatan parser</p>
                   <ul className="mt-1 list-disc pl-5">
                     {parserWarnings.map((warning) => (
@@ -306,7 +326,7 @@ export default function HomePage() {
                 <TextInput type="date" label="Tanggal follow-up" value={recommendationForm.follow_up_date} onChange={(follow_up_date) => setRecommendationForm({ ...recommendationForm, follow_up_date })} />
                 <TextInput label="Estimasi nilai" value={String(recommendationForm.estimated_value || "")} onChange={(value) => setRecommendationForm({ ...recommendationForm, estimated_value: parseMoney(value) })} placeholder="Rp250.000" />
               </div>
-              <button className="focus-ring inline-flex items-center justify-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white" onClick={saveRecommendation}>
+              <button className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-800" onClick={saveRecommendation}>
                 <Save size={16} />
                 Simpan Saran Mekanik
               </button>
@@ -315,11 +335,11 @@ export default function HomePage() {
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-          <Panel title="Monitor Hotline Order" icon={<Clipboard size={18} />}>
+          <Panel title="Monitor Hotline Order" icon={<Database size={18} />}>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px] border-collapse text-left text-sm">
+              <table className="w-full min-w-[860px] border-collapse text-left text-sm">
                 <thead>
-                  <tr className="border-b border-line text-xs uppercase text-slate-500">
+                  <tr className="border-b border-line bg-slate-50 text-xs uppercase text-slate-500">
                     <th className="py-2 pr-3">PO</th>
                     <th className="py-2 pr-3">Konsumen</th>
                     <th className="py-2 pr-3">Part</th>
@@ -330,7 +350,7 @@ export default function HomePage() {
                 </thead>
                 <tbody>
                   {data.hotlines.map((order) => (
-                    <tr key={order.id} className="border-b border-line/70">
+                    <tr key={order.id} className="border-b border-line/70 hover:bg-slate-50">
                       <td className="py-2 pr-3 font-semibold">{order.dealer_po_number || "-"}</td>
                       <td className="py-2 pr-3">
                         <div className="font-medium">{order.customer_name}</div>
@@ -345,12 +365,12 @@ export default function HomePage() {
                       <td className="py-2 pr-3">
                         <div>{order.eta_revision || "-"}</div>
                         <div className="text-xs text-slate-500">
-                          {order.portal_status || "-"} {order.progress_percent ? `· ${order.progress_percent}` : ""}
+                          {order.portal_status || "-"} {order.progress_percent ? ` / ${order.progress_percent}` : ""}
                         </div>
                       </td>
                       <td className="py-2 pr-3">{formatCurrency(order.price)}</td>
                       <td className="py-2 pr-3">
-                        <select className="focus-ring rounded-md border border-line bg-white px-2 py-1" value={order.status} onChange={(event) => updateHotline(order, event.target.value as HotlineStatus)}>
+                        <select className="focus-ring rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold shadow-sm" value={order.status} onChange={(event) => updateHotline(order, event.target.value as HotlineStatus)}>
                           {hotlineStatuses.map((status) => (
                             <option key={status}>{status}</option>
                           ))}
@@ -367,22 +387,22 @@ export default function HomePage() {
           <Panel title="Reminder WhatsApp" icon={<MessageSquareText size={18} />}>
             <div className="grid gap-3">
               {data.reminders.map((reminder) => (
-                <article key={reminder.id} className="rounded-md border border-line bg-panel p-3">
+                <article key={reminder.id} className="rounded-md border border-line bg-slate-50 p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold">{reminder.customer_name}</p>
                       <p className="text-xs text-slate-500">
-                        {reminder.source_type} · jatuh tempo {reminder.due_date}
+                        {reminder.source_type} / jatuh tempo {reminder.due_date}
                       </p>
                     </div>
                     <Badge>{reminder.status}</Badge>
                   </div>
                   <p className="mt-2 text-sm leading-6">{reminder.message}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button className="focus-ring rounded-md bg-brand px-3 py-2 text-xs font-semibold text-white" onClick={() => copyReminder(reminder)}>
+                    <button className="focus-ring min-h-9 rounded-md bg-brand px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-teal-800" onClick={() => copyReminder(reminder)}>
                       Copy Pesan
                     </button>
-                    <select className="focus-ring rounded-md border border-line bg-white px-2 py-1 text-xs" value={reminder.status} onChange={(event) => updateReminder(reminder.id, event.target.value as ReminderStatus)}>
+                    <select className="focus-ring rounded-md border border-line bg-white px-2 py-1 text-xs shadow-sm" value={reminder.status} onChange={(event) => updateReminder(reminder.id, event.target.value as ReminderStatus)}>
                       {reminderStatuses.map((status) => (
                         <option key={status}>{status}</option>
                       ))}
@@ -399,7 +419,7 @@ export default function HomePage() {
           <Panel title="Rekap Bulanan" icon={<FileDown size={18} />}>
             <div className="flex flex-wrap items-end gap-3">
               <TextInput type="month" label="Periode" value={month} onChange={setMonth} />
-              <a className="focus-ring inline-flex items-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white" href={`/api/export/monthly?month=${month}`}>
+              <a className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-800" href={`/api/export/monthly?month=${month}`}>
                 <FileDown size={16} />
                 Export CSV
               </a>
@@ -407,7 +427,7 @@ export default function HomePage() {
             <p className="mt-3 text-sm font-semibold">Total periode: {formatCurrency(monthlyTotal)}</p>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="text-xs uppercase text-slate-500">
+                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                   <tr className="border-b border-line">
                     <th className="py-2 pr-3">No</th>
                     <th className="py-2 pr-3">PO</th>
@@ -420,7 +440,7 @@ export default function HomePage() {
                 </thead>
                 <tbody>
                   {monthlyOrders.map((order, index) => (
-                    <tr key={order.id} className="border-b border-line/70">
+                    <tr key={order.id} className="border-b border-line/70 hover:bg-slate-50">
                       <td className="py-2 pr-3">{index + 1}</td>
                       <td className="py-2 pr-3">{order.dealer_po_number}</td>
                       <td className="py-2 pr-3">{order.po_date}</td>
@@ -445,7 +465,7 @@ export default function HomePage() {
           </Panel>
         </section>
 
-        <p className="text-center text-xs text-slate-500">{loading ? "Memuat data cloud..." : "REMINDRA cloud-ready. Parser Portal HO aktif, WhatsApp tetap mode copy pesan."}</p>
+        <p className="pb-3 text-center text-xs text-slate-500">{loading ? "Memuat data cloud..." : "REMINDRA cloud-ready. Parser Portal HO aktif, WhatsApp tetap mode copy pesan."}</p>
       </div>
     </main>
   );
@@ -463,10 +483,10 @@ function ParsedHotlineList({
   return (
     <div className="grid gap-3">
       {rows.map((value, index) => (
-        <div key={value.parse_id} className="rounded-md border border-line bg-panel p-3">
-          <label className="mb-3 flex items-center gap-2 text-sm font-semibold">
+        <div key={value.parse_id} className="rounded-md border border-line bg-slate-50 p-3">
+          <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
             <input
-              className="h-4 w-4"
+              className="h-4 w-4 rounded border-line text-brand"
               type="checkbox"
               checked={value.selected}
               onChange={(event) => onChange(value.parse_id, { selected: event.target.checked })}
@@ -495,7 +515,7 @@ function ParsedHotlineList({
           </div>
         </div>
       ))}
-      <button className="focus-ring inline-flex items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white" onClick={onSave}>
+      <button className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-800" onClick={onSave}>
         <Save size={16} />
         Simpan Item Terpilih ke Database
       </button>
@@ -507,20 +527,28 @@ function TemplateEditor({ name, body, onSave }: { name: string; body: string; on
   const [draft, setDraft] = useState(body);
   useEffect(() => setDraft(body), [body]);
   return (
-    <div className="rounded-md border border-line bg-panel p-3">
+    <div className="rounded-md border border-line bg-slate-50 p-3">
       <p className="mb-2 text-sm font-semibold">{name}</p>
-      <textarea className="focus-ring min-h-24 w-full rounded-md border border-line bg-white p-3 text-sm" value={draft} onChange={(event) => setDraft(event.target.value)} />
-      <button className="focus-ring mt-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold" onClick={() => onSave(draft)}>
+      <textarea className="focus-ring min-h-24 w-full rounded-md border border-line bg-white p-3 text-sm leading-6 shadow-inner" value={draft} onChange={(event) => setDraft(event.target.value)} />
+      <button className="focus-ring mt-2 min-h-9 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50" onClick={() => onSave(draft)}>
         Simpan Template
       </button>
     </div>
   );
 }
 
-function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+function Metric({ icon, label, value, tone }: { icon: ReactNode; label: string; value: string; tone: "brand" | "amber" | "slate" | "blue" | "green" }) {
+  const toneClass = {
+    brand: "bg-teal-50 text-teal-700 border-teal-100",
+    amber: "bg-amber-50 text-amber-700 border-amber-100",
+    slate: "bg-slate-100 text-slate-700 border-slate-200",
+    blue: "bg-sky-50 text-sky-700 border-sky-100",
+    green: "bg-emerald-50 text-emerald-700 border-emerald-100"
+  }[tone];
+
   return (
-    <div className="rounded-md border border-line bg-white p-4">
-      <div className="flex items-center gap-2 text-brand">{icon}</div>
+    <div className="rounded-md border border-line bg-white p-4 shadow-sm">
+      <div className={`inline-flex h-9 w-9 items-center justify-center rounded-md border ${toneClass}`}>{icon}</div>
       <p className="mt-3 text-xs font-semibold uppercase text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-bold text-ink">{value}</p>
     </div>
@@ -529,12 +557,12 @@ function Metric({ icon, label, value }: { icon: ReactNode; label: string; value:
 
 function Panel({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-md border border-line bg-white p-4">
-      <div className="mb-3 flex items-center gap-2">
+    <section className="rounded-md border border-line bg-white shadow-sm">
+      <div className="flex items-center gap-2 border-b border-line px-4 py-3">
         <span className="text-brand">{icon}</span>
         <h2 className="text-base font-bold text-ink">{title}</h2>
       </div>
-      {children}
+      <div className="p-4">{children}</div>
     </section>
   );
 }
@@ -543,7 +571,7 @@ function TextInput({ label, value, onChange, type = "text", placeholder }: { lab
   return (
     <label className="grid gap-1 text-sm font-medium text-ink">
       {label}
-      <input className="focus-ring rounded-md border border-line bg-white px-3 py-2 text-sm" type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+      <input className="focus-ring min-h-10 rounded-md border border-line bg-white px-3 py-2 text-sm shadow-sm placeholder:text-slate-400" type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }
@@ -552,7 +580,7 @@ function SelectInput({ label, value, options, onChange }: { label: string; value
   return (
     <label className="grid gap-1 text-sm font-medium text-ink">
       {label}
-      <select className="focus-ring rounded-md border border-line bg-white px-3 py-2 text-sm" value={value} onChange={(event) => onChange(event.target.value)}>
+      <select className="focus-ring min-h-10 rounded-md border border-line bg-white px-3 py-2 text-sm shadow-sm" value={value} onChange={(event) => onChange(event.target.value)}>
         {options.map((option) => (
           <option key={option}>{option}</option>
         ))}
@@ -562,9 +590,19 @@ function SelectInput({ label, value, options, onChange }: { label: string; value
 }
 
 function Badge({ children }: { children: ReactNode }) {
-  return <span className="rounded-full border border-line bg-white px-2 py-1 text-xs font-semibold text-slate-600">{children}</span>;
+  return <span className="rounded-full border border-line bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-sm">{children}</span>;
+}
+
+function StatusPill({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="inline-flex min-h-10 items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm">
+      <span className="text-brand">{icon}</span>
+      <span>{label}</span>
+      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">{value}</span>
+    </div>
+  );
 }
 
 function EmptyState({ text }: { text: string }) {
-  return <div className="rounded-md border border-dashed border-line p-4 text-center text-sm text-slate-500">{text}</div>;
+  return <div className="rounded-md border border-dashed border-line bg-slate-50 p-4 text-center text-sm text-slate-500">{text}</div>;
 }
