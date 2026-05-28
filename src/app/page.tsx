@@ -36,6 +36,18 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 const hotlineStatuses: HotlineStatus[] = ["Booked", "Arrived", "Followed Up", "Converted", "Cancelled"];
 const reminderStatuses: ReminderStatus[] = ["pending", "copied", "followed_up", "converted", "cancelled"];
 
+type AppView = "dashboard" | "parser" | "wo" | "monitor" | "reminder" | "rekap" | "template";
+
+const navigationItems: Array<{ id: AppView; label: string; shortLabel: string; icon: ReactNode }> = [
+  { id: "dashboard", label: "Dashboard", shortLabel: "Home", icon: <Gauge size={18} /> },
+  { id: "parser", label: "Parser HO", shortLabel: "Parser", icon: <Clipboard size={18} /> },
+  { id: "wo", label: "WO Checklist", shortLabel: "WO", icon: <Wrench size={18} /> },
+  { id: "monitor", label: "Monitor HO", shortLabel: "Monitor", icon: <Database size={18} /> },
+  { id: "reminder", label: "Reminder", shortLabel: "Reminder", icon: <MessageSquareText size={18} /> },
+  { id: "rekap", label: "Rekap Bulanan", shortLabel: "Rekap", icon: <FileDown size={18} /> },
+  { id: "template", label: "Template", shortLabel: "Template", icon: <Settings size={18} /> }
+];
+
 const emptyHotline: HotlineOrderInput = {
   dealer_po_number: "",
   po_date: todayISO(),
@@ -88,6 +100,7 @@ export default function HomePage() {
   const [parserWarnings, setParserWarnings] = useState<string[]>([]);
   const [recommendationForm, setRecommendationForm] = useState<MechanicRecommendationInput>(emptyRecommendation);
   const [month, setMonth] = useState(todayISO().slice(0, 7));
+  const [activeView, setActiveView] = useState<AppView>("dashboard");
 
   const metrics = useMemo(() => {
     const activeHotlines = data.hotlines.filter((order) => !["Converted", "Cancelled"].includes(order.status)).length;
@@ -237,54 +250,86 @@ export default function HomePage() {
     await loadData();
   }
 
+  const activeTitle = navigationItems.find((item) => item.id === activeView)?.label ?? "Dashboard";
+
   return (
-    <main className="min-h-screen bg-slate-100 text-ink">
-      <header className="sticky top-0 z-20 border-b border-line/80 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between lg:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand text-white shadow-sm">
-              <Activity size={22} />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-bold tracking-normal text-ink md:text-2xl">REMINDRA</h1>
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Cloud v1</span>
+    <main className="min-h-screen bg-slate-100 text-ink md:flex">
+      <SidebarNavigation activeView={activeView} onChange={setActiveView} onSignOut={signOut} />
+
+      <div className="min-w-0 flex-1 pb-24 md:pb-0">
+        <header className="sticky top-0 z-20 border-b border-line/80 bg-white/95 backdrop-blur">
+          <div className="flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between lg:px-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand text-white shadow-sm md:hidden">
+                <Activity size={22} />
               </div>
-              <p className="mt-0.5 text-sm text-slate-500">Retensi konsumen, Hotline Order, WO checklist, dan reminder AHASS.</p>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-xl font-bold tracking-normal text-ink md:text-2xl">{activeTitle}</h1>
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Cloud v1</span>
+                </div>
+                <p className="mt-0.5 text-sm text-slate-500">REMINDRA untuk retensi konsumen, Hotline Order, dan reminder AHASS.</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusPill icon={<Cloud size={14} />} label="Supabase" value="Online" />
+              <button className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" onClick={loadData}>
+                <RefreshCw size={16} />
+                Refresh
+              </button>
+              <button className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" onClick={signOut}>
+                <LogOut size={16} />
+                Keluar
+              </button>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusPill icon={<Cloud size={14} />} label="Supabase" value="Online" />
-            <button className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" onClick={loadData}>
-              <RefreshCw size={16} />
-              Refresh
-            </button>
-            <button className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" onClick={signOut}>
-              <LogOut size={16} />
-              Keluar
-            </button>
-          </div>
-        </div>
-      </header>
+        </header>
 
-      <div className="mx-auto grid max-w-[1440px] gap-5 px-4 py-5 lg:px-6">
-        {feedback ? (
-          <div className="rounded-md border border-brand/20 bg-white px-4 py-3 text-sm font-medium text-ink shadow-sm">
-            <span className="mr-2 inline-flex h-2 w-2 rounded-full bg-brand" />
-            {feedback}
-          </div>
-        ) : null}
+        <div className="grid gap-5 px-4 py-5 lg:px-6">
+          {feedback ? (
+            <div className="rounded-md border border-brand/20 bg-white px-4 py-3 text-sm font-medium text-ink shadow-sm">
+              <span className="mr-2 inline-flex h-2 w-2 rounded-full bg-brand" />
+              {feedback}
+            </div>
+          ) : null}
 
-        <section className="grid gap-3 md:grid-cols-5">
-          <Metric icon={<Database size={18} />} label="HO aktif" value={String(metrics.activeHotlines)} tone="brand" />
-          <Metric icon={<Bell size={18} />} label="Reminder pending" value={String(metrics.pendingReminders)} tone="amber" />
-          <Metric icon={<Clipboard size={18} />} label="Follow-up/copy" value={String(metrics.followedUp)} tone="slate" />
-          <Metric icon={<Gauge size={18} />} label="Konversi" value={`${metrics.conversionRate}%`} tone="blue" />
-          <Metric icon={<FileDown size={18} />} label="Estimasi omzet" value={formatCurrency(metrics.savedRevenue)} tone="green" />
-        </section>
+          {activeView === "dashboard" ? (
+            <>
+              <section className="grid gap-3 md:grid-cols-5">
+                <Metric icon={<Database size={18} />} label="HO aktif" value={String(metrics.activeHotlines)} tone="brand" />
+                <Metric icon={<Bell size={18} />} label="Reminder pending" value={String(metrics.pendingReminders)} tone="amber" />
+                <Metric icon={<Clipboard size={18} />} label="Follow-up/copy" value={String(metrics.followedUp)} tone="slate" />
+                <Metric icon={<Gauge size={18} />} label="Konversi" value={`${metrics.conversionRate}%`} tone="blue" />
+                <Metric icon={<FileDown size={18} />} label="Estimasi omzet" value={formatCurrency(metrics.savedRevenue)} tone="green" />
+              </section>
+              <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                <Panel title="Ringkasan Hotline Order" icon={<Database size={18} />}>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <SummaryBox label="Total HO" value={String(data.hotlines.length)} />
+                    <SummaryBox label="WO Checklist" value={String(data.recommendations.length)} />
+                    <SummaryBox label="Reminder" value={String(data.reminders.length)} />
+                  </div>
+                </Panel>
+                <Panel title="Prioritas Reminder" icon={<Bell size={18} />}>
+                  <div className="grid gap-2">
+                    {data.reminders.slice(0, 4).map((reminder) => (
+                      <div key={reminder.id} className="flex items-center justify-between gap-3 rounded-md border border-line bg-slate-50 px-3 py-2 text-sm">
+                        <div>
+                          <p className="font-semibold">{reminder.customer_name}</p>
+                          <p className="text-xs text-slate-500">{reminder.due_date}</p>
+                        </div>
+                        <Badge>{reminder.status}</Badge>
+                      </div>
+                    ))}
+                    {!data.reminders.length ? <EmptyState text="Belum ada reminder." /> : null}
+                  </div>
+                </Panel>
+              </section>
+            </>
+          ) : null}
 
-        <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-          <Panel title="Parser Hotline Order" icon={<Clipboard size={18} />}>
+          {activeView === "parser" ? (
+            <Panel title="Parser Hotline Order" icon={<Clipboard size={18} />}>
             <div className="grid gap-3">
               <textarea
                 className="focus-ring min-h-40 rounded-md border border-line bg-slate-50 p-3 text-sm leading-6 shadow-inner placeholder:text-slate-400"
@@ -313,9 +358,11 @@ export default function HomePage() {
               ) : null}
               <ParsedHotlineList rows={parsedHotlines} onChange={updateParsedHotline} onSave={saveParsedHotlines} />
             </div>
-          </Panel>
+            </Panel>
+          ) : null}
 
-          <Panel title="Quick WO Checklist" icon={<Wrench size={18} />}>
+          {activeView === "wo" ? (
+            <Panel title="Quick WO Checklist" icon={<Wrench size={18} />}>
             <div className="grid gap-3">
               <TextInput label="Nama konsumen" value={recommendationForm.customer_name} onChange={(customer_name) => setRecommendationForm({ ...recommendationForm, customer_name })} />
               <TextInput label="No telepon" value={recommendationForm.phone_number} onChange={(phone_number) => setRecommendationForm({ ...recommendationForm, phone_number })} />
@@ -331,11 +378,11 @@ export default function HomePage() {
                 Simpan Saran Mekanik
               </button>
             </div>
-          </Panel>
-        </section>
+            </Panel>
+          ) : null}
 
-        <section className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-          <Panel title="Monitor Hotline Order" icon={<Database size={18} />}>
+          {activeView === "monitor" ? (
+            <Panel title="Monitor Hotline Order" icon={<Database size={18} />}>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[860px] border-collapse text-left text-sm">
                 <thead>
@@ -382,9 +429,11 @@ export default function HomePage() {
               </table>
               {!data.hotlines.length ? <EmptyState text="Belum ada Hotline Order." /> : null}
             </div>
-          </Panel>
+            </Panel>
+          ) : null}
 
-          <Panel title="Reminder WhatsApp" icon={<MessageSquareText size={18} />}>
+          {activeView === "reminder" ? (
+            <Panel title="Reminder WhatsApp" icon={<MessageSquareText size={18} />}>
             <div className="grid gap-3">
               {data.reminders.map((reminder) => (
                 <article key={reminder.id} className="rounded-md border border-line bg-slate-50 p-3">
@@ -412,11 +461,11 @@ export default function HomePage() {
               ))}
               {!data.reminders.length ? <EmptyState text="Belum ada reminder." /> : null}
             </div>
-          </Panel>
-        </section>
+            </Panel>
+          ) : null}
 
-        <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-          <Panel title="Rekap Bulanan" icon={<FileDown size={18} />}>
+          {activeView === "rekap" ? (
+            <Panel title="Rekap Bulanan" icon={<FileDown size={18} />}>
             <div className="flex flex-wrap items-end gap-3">
               <TextInput type="month" label="Periode" value={month} onChange={setMonth} />
               <a className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-800" href={`/api/export/monthly?month=${month}`}>
@@ -454,19 +503,25 @@ export default function HomePage() {
               </table>
               {!monthlyOrders.length ? <EmptyState text="Belum ada data di periode ini." /> : null}
             </div>
-          </Panel>
+            </Panel>
+          ) : null}
 
-          <Panel title="Settings Template" icon={<Settings size={18} />}>
+          {activeView === "template" ? (
+            <Panel title="Settings Template" icon={<Settings size={18} />}>
             <div className="grid gap-3">
               {data.templates.map((template) => (
                 <TemplateEditor key={template.id} name={template.name} body={template.body} onSave={(body) => saveTemplate(template.type, body)} />
               ))}
+              {!data.templates.length ? <EmptyState text="Template belum tersedia." /> : null}
             </div>
-          </Panel>
-        </section>
+            </Panel>
+          ) : null}
 
-        <p className="pb-3 text-center text-xs text-slate-500">{loading ? "Memuat data cloud..." : "REMINDRA cloud-ready. Parser Portal HO aktif, WhatsApp tetap mode copy pesan."}</p>
+          <p className="pb-3 text-center text-xs text-slate-500">{loading ? "Memuat data cloud..." : "REMINDRA cloud-ready. Parser Portal HO aktif, WhatsApp tetap mode copy pesan."}</p>
+        </div>
       </div>
+
+      <BottomNavigation activeView={activeView} onChange={setActiveView} />
     </main>
   );
 }
@@ -533,6 +588,80 @@ function TemplateEditor({ name, body, onSave }: { name: string; body: string; on
       <button className="focus-ring mt-2 min-h-9 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50" onClick={() => onSave(draft)}>
         Simpan Template
       </button>
+    </div>
+  );
+}
+
+function SidebarNavigation({ activeView, onChange, onSignOut }: { activeView: AppView; onChange: (view: AppView) => void; onSignOut: () => void }) {
+  return (
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-line bg-white p-4 md:flex md:flex-col">
+      <div className="flex items-center gap-3 border-b border-line pb-4">
+        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand text-white shadow-sm">
+          <Activity size={22} />
+        </div>
+        <div>
+          <p className="text-lg font-bold text-ink">REMINDRA</p>
+          <p className="text-xs font-semibold uppercase text-slate-500">AHASS 12802</p>
+        </div>
+      </div>
+      <nav className="mt-4 grid gap-1">
+        {navigationItems.map((item) => (
+          <NavigationButton key={item.id} item={item} active={activeView === item.id} onClick={() => onChange(item.id)} />
+        ))}
+      </nav>
+      <div className="mt-auto grid gap-3 border-t border-line pt-4">
+        <StatusPill icon={<Cloud size={14} />} label="Cloud" value="Ready" />
+        <button className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" onClick={onSignOut}>
+          <LogOut size={16} />
+          Keluar
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function BottomNavigation({ activeView, onChange }: { activeView: AppView; onChange: (view: AppView) => void }) {
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 px-2 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur md:hidden">
+      <div className="flex gap-1 overflow-x-auto">
+        {navigationItems.map((item) => (
+          <button
+            key={item.id}
+            className={`focus-ring flex min-w-[68px] flex-1 flex-col items-center justify-center gap-1 rounded-md px-2 py-2 text-[11px] font-semibold ${
+              activeView === item.id ? "bg-brand text-white" : "text-slate-500 hover:bg-slate-50"
+            }`}
+            onClick={() => onChange(item.id)}
+            type="button"
+          >
+            {item.icon}
+            <span>{item.shortLabel}</span>
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function NavigationButton({ item, active, onClick }: { item: { label: string; icon: ReactNode }; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      className={`focus-ring inline-flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold ${
+        active ? "bg-brand text-white shadow-sm" : "text-slate-600 hover:bg-slate-50 hover:text-ink"
+      }`}
+      onClick={onClick}
+      type="button"
+    >
+      {item.icon}
+      {item.label}
+    </button>
+  );
+}
+
+function SummaryBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-line bg-slate-50 p-4">
+      <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-ink">{value}</p>
     </div>
   );
 }
