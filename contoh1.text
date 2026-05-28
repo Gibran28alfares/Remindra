@@ -1,0 +1,44 @@
+Kode AHASS	12802	No Po Dealer	12802/0082/2026
+Kode Dealer Md	P-THFL	Tgl Po Dealer	24-MAY-2026
+Nama AHASS	PT. SANPRIMA SENTOSA	Tgl Verifikasi Dealer	25-MAY-2026 15:18:15
+Booking ID	
+Nomor Mesin	JF22E1187429
+(Input No Mesin dan tekan ENTER untuk memunculkan data konsumen)
+Nama Konsumen	PURWOKO SUPRIHATONO, SE	Warehouse	KARAWANG
+Alamat Konsumen	JL. CENDRAWASIH 3 BLOK AI NO. 06 BDB RT 01 RW 13
+Kota	KAB. BOGOR	Status	Approved
+Kode Pos	16320	Aktif	0
+No Tlp Konsumen	087870542207	Pengajuan	0
+Tipe Motor	NC11B2CA/T*BK
+(input Tipe Motor sesuai STNK dengan *Kode Warna dan tekan ENTER
+untuk memunculkan Kode Motor. Contoh: X1B02N04L0 A/T*BK)
+Kode Motor	CM1		Flag Numbering
+Thn Rakit	2009		Claim C2
+No Claim:	
+Email	mohamadgibranalfares@gmail.com		VOR (Vehicle of The Road)
+Nama Type	
+NEW BEAT
+Job Return
+Warna Motor	
+BLACK
+Source	PORTAL
+Kecamatan	KEC. CIBINONG
+Kelurahan	SUKAHATI
+Nomor Polisi	F 3974 LT
+Deskripsi Unit	NEW BEAT
+Kode Warna	BK
+Nomor Rangka	JF22159K186909
+Keterangan Tambahan	
+Down Payment	
+Upload Data	   
+Jenis	Keterangan	Image
+BUKTI PEMESANAN	-	Download
+STNK	-	Download
+1 - 2		
+Item Order	   
+	Item Number	Description	Order Qty	Qty Max HO	Import / Local	Current / Non Current	Status	Alasan	Ongkir	Rank Part	Kelompok Barang	Subtotal
+	22401KVY900	SPRING CLUTCH	3	3	LOCAL	NON CURRENT		-	TIDAK	A	A H M	21000
+ 	 	 	 	 	 	 	 	 	 	 	 	21000
+Item Order Detail	   
+Edit	Item Number	Item Number Lama	Order Qty	Qty Pemenuhan	No So	No Invoice	Tgl Invoice	No SJ	Tgl SJ	ETA Tercepat	ETA Terlama	ETA Revisi	% Progress	Status
+Edit	22401KVY900	-	3	3	326074019731	-	-	-	-	27-MAY-26	04-JUN-26	02-JUN-26	40%	Picked
