@@ -156,7 +156,9 @@ export async function updateReminderStatus(id: number, status: ReminderStatus) {
     .select("*")
     .single();
   throwIfError(error);
-  return data as ReminderTask;
+  const reminder = data as ReminderTask;
+  await syncReminderSourceStatus(reminder, status);
+  return reminder;
 }
 
 export async function queueWhatsappReminder(id: number, override = false) {
@@ -210,7 +212,7 @@ export async function markWhatsappSent(reminderId: number, logId: number, waMess
   const now = new Date().toISOString();
   const reminder = await getReminderById(reminderId);
   const [reminderResult, logResult] = await Promise.all([
-    supabase.from("reminder_tasks").update({ status: "sent", updated_at: now }).eq("id", reminderId).select("*").single(),
+    supabase.from("reminder_tasks").update({ status: "followed_up", updated_at: now }).eq("id", reminderId).select("*").single(),
     supabase
       .from("whatsapp_message_logs")
       .update({ delivery_status: "sent", wa_message_id: waMessageId, sent_at: now, updated_at: now })
@@ -220,7 +222,7 @@ export async function markWhatsappSent(reminderId: number, logId: number, waMess
   ]);
   throwIfError(reminderResult.error);
   throwIfError(logResult.error);
-  await markSourceFollowedUp(reminder);
+  await syncReminderSourceStatus(reminder, "followed_up");
   return {
     reminder: reminderResult.data as ReminderTask,
     log: normalizeWhatsappLogRow(logResult.data as WhatsappMessageLog)
@@ -260,9 +262,12 @@ export async function updateWhatsappDeliveryByMessageId(waMessageId: string, del
   throwIfError(logError);
 
   const normalizedLog = normalizeWhatsappLogRow(log as WhatsappMessageLog);
-  if (normalizedLog.reminder_id && ["delivered", "read", "failed"].includes(deliveryStatus)) {
-    const { error: reminderError } = await supabase.from("reminder_tasks").update({ status: deliveryStatus, updated_at: now }).eq("id", normalizedLog.reminder_id);
-    throwIfError(reminderError);
+  if (normalizedLog.reminder_id && deliveryStatus === "failed") {
+    const reminder = await getReminderById(normalizedLog.reminder_id);
+    if (!["followed_up", "converted", "cancelled"].includes(reminder.status)) {
+      const { error: reminderError } = await supabase.from("reminder_tasks").update({ status: "failed", updated_at: now }).eq("id", normalizedLog.reminder_id);
+      throwIfError(reminderError);
+    }
   }
   return normalizedLog;
 }
@@ -375,17 +380,25 @@ async function assertReminderCanSend(reminder: ReminderTask, override: boolean) 
   }
 }
 
-async function markSourceFollowedUp(reminder: ReminderTask) {
+async function syncReminderSourceStatus(reminder: ReminderTask, status: ReminderStatus) {
+  if (!["followed_up", "converted", "cancelled"].includes(status)) {
+    return;
+  }
+
   const { supabase } = await requireUser();
   const now = new Date().toISOString();
 
   if (reminder.source_type === "hotline") {
-    const { error } = await supabase.from("hotline_orders").update({ follow_up_status: "sent", updated_at: now }).eq("id", reminder.source_id);
+    const hotlineStatus = status === "followed_up" ? "Followed Up" : status === "converted" ? "Converted" : "Cancelled";
+    const { error } = await supabase
+      .from("hotline_orders")
+      .update({ status: hotlineStatus, follow_up_status: status, updated_at: now })
+      .eq("id", reminder.source_id);
     throwIfError(error);
     return;
   }
 
-  const { error } = await supabase.from("mechanic_recommendations").update({ status: "sent", updated_at: now }).eq("id", reminder.source_id);
+  const { error } = await supabase.from("mechanic_recommendations").update({ status, updated_at: now }).eq("id", reminder.source_id);
   throwIfError(error);
 }
 

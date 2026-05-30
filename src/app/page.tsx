@@ -41,7 +41,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const hotlineStatuses: HotlineStatus[] = ["Booked", "Arrived", "Followed Up", "Converted", "Cancelled"];
 const hotlineActionStatuses: Array<{ status: HotlineStatus; label: string }> = [
-  { status: "Arrived", label: "Tandai Arrived" },
+  { status: "Arrived", label: "Tandai Tiba" },
   { status: "Followed Up", label: "Followed Up" },
   { status: "Converted", label: "Converted" },
   { status: "Cancelled", label: "Cancel" }
@@ -133,7 +133,7 @@ export default function HomePage() {
   const metrics = useMemo(() => {
     const activeHotlines = data.hotlines.filter((order) => !["Converted", "Cancelled"].includes(order.status)).length;
     const pendingReminders = data.reminders.filter((reminder) => reminder.status === "pending").length;
-    const followedUp = data.reminders.filter((reminder) => ["copied", "followed_up", "converted"].includes(reminder.status)).length;
+    const followedUp = data.reminders.filter((reminder) => ["followed_up", "converted"].includes(reminder.status)).length;
     const converted = data.reminders.filter((reminder) => reminder.status === "converted").length;
     const totalReminder = data.reminders.length || 1;
     const hoValue = data.hotlines.reduce((total, order) => total + order.price, 0);
@@ -381,6 +381,11 @@ export default function HomePage() {
     setFeedback(`Pesan untuk ${reminder.customer_name} disalin.`);
   }
 
+  function markReminderOpenedInWhatsapp(reminder: ReminderTask) {
+    void updateReminder(reminder.id, "followed_up");
+    setFeedback(`Follow-up ${reminder.customer_name} ditandai dan WhatsApp dibuka.`);
+  }
+
   async function sendWhatsappReminder(reminder: ReminderTask, override = false) {
     const response = await fetch("/api/whatsapp/send", {
       method: "POST",
@@ -470,7 +475,7 @@ export default function HomePage() {
               <section className="grid gap-3 md:grid-cols-5">
                 <Metric icon={<Database size={18} />} label="HO aktif" value={String(metrics.activeHotlines)} tone="brand" />
                 <Metric icon={<Bell size={18} />} label="Reminder pending" value={String(metrics.pendingReminders)} tone="amber" />
-                <Metric icon={<Clipboard size={18} />} label="Follow-up/copy" value={String(metrics.followedUp)} tone="slate" />
+                <Metric icon={<Clipboard size={18} />} label="Follow-up selesai" value={String(metrics.followedUp)} tone="slate" />
                 <Metric icon={<Gauge size={18} />} label="Konversi" value={`${metrics.conversionRate}%`} tone="blue" />
                 <Metric icon={<FileDown size={18} />} label="Estimasi omzet" value={formatCurrency(metrics.savedRevenue)} tone="green" />
               </section>
@@ -759,7 +764,7 @@ export default function HomePage() {
                     <button className="focus-ring min-h-9 rounded-md bg-brand px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-teal-800" onClick={() => copyReminder(reminder)}>
                       Copy Pesan
                     </button>
-                    <a className="focus-ring inline-flex min-h-9 items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50" href={getWhatsAppUrl(reminder)} target="_blank" rel="noreferrer">
+                    <a className="focus-ring inline-flex min-h-9 items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50" href={getWhatsAppUrl(reminder)} target="_blank" rel="noreferrer" onClick={() => markReminderOpenedInWhatsapp(reminder)}>
                       <Send size={14} />
                       Buka WA
                     </a>
@@ -1282,7 +1287,7 @@ function HotlineStatusActions({ current, onSelect, compact = false, className = 
           key={item.status}
           active={current === item.status}
           danger={item.status === "Cancelled"}
-          label={compact && item.status === "Arrived" ? "Arrived" : item.label}
+          label={compact && item.status === "Arrived" ? "Tiba" : item.label}
           onClick={() => onSelect(item.status)}
         />
       ))}
@@ -1354,6 +1359,7 @@ function getStatusTone(status: string) {
 
 function getStatusLabel(status: string) {
   const labels: Record<string, string> = {
+    Arrived: "Tiba",
     followed_up: "Followed Up",
     copied: "Copied",
     converted: "Converted",

@@ -60,10 +60,13 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const reminderStatus = deliveryStatus === "failed" ? "failed" : deliveryStatus;
       const reminderId = (log as WhatsappMessageLog).reminder_id;
-      if (reminderId && ["delivered", "read", "failed"].includes(reminderStatus)) {
-        await supabase.from("reminder_tasks").update({ status: reminderStatus, updated_at: now }).eq("id", reminderId);
+      if (reminderId && deliveryStatus === "failed") {
+        const { data: reminder } = await supabase.from("reminder_tasks").select("status").eq("id", reminderId).single();
+        const currentStatus = reminder?.status;
+        if (!["followed_up", "converted", "cancelled"].includes(currentStatus)) {
+          await supabase.from("reminder_tasks").update({ status: "failed", updated_at: now }).eq("id", reminderId);
+        }
       }
     }
 
