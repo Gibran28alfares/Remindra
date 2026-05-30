@@ -5,3 +5,4 @@ data/*.db-shm
 data/*.db-wal
 .env.local
 dev-server*.log
+tsconfig.tsbuildinfo
