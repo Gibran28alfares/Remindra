@@ -80,6 +80,28 @@ export async function updateHotlineStatus(id: number, status: string, followUpSt
   return order;
 }
 
+export async function updateHotlineOrder(id: number, input: HotlineOrderInput) {
+  const { supabase } = await requireUser();
+  const row = { ...normalizeHotlineInput(input), updated_at: new Date().toISOString() };
+  const { data, error } = await supabase.from("hotline_orders").update(row).eq("id", id).select("*").single();
+  throwIfError(error);
+
+  const order = normalizeHotlineRow(data as HotlineOrder);
+  if (order.status === "Arrived") {
+    await upsertHotlineReminder(order);
+  } else {
+    await deleteReminderBySource("hotline", order.id);
+  }
+  return order;
+}
+
+export async function deleteHotlineOrder(id: number) {
+  const { supabase } = await requireUser();
+  await deleteReminderBySource("hotline", id);
+  const { error } = await supabase.from("hotline_orders").delete().eq("id", id);
+  throwIfError(error);
+}
+
 export async function createRecommendation(input: MechanicRecommendationInput) {
   const { supabase } = await requireUser();
   const row = {
@@ -93,6 +115,29 @@ export async function createRecommendation(input: MechanicRecommendationInput) {
   const recommendation = data as MechanicRecommendation;
   await upsertMechanicReminder(recommendation);
   return recommendation;
+}
+
+export async function updateRecommendation(id: number, input: MechanicRecommendationInput) {
+  const { supabase } = await requireUser();
+  const row = {
+    ...input,
+    estimated_value: Number(input.estimated_value) || 0,
+    status: input.status || "pending",
+    updated_at: new Date().toISOString()
+  };
+  const { data, error } = await supabase.from("mechanic_recommendations").update(row).eq("id", id).select("*").single();
+  throwIfError(error);
+
+  const recommendation = data as MechanicRecommendation;
+  await upsertMechanicReminder(recommendation);
+  return recommendation;
+}
+
+export async function deleteRecommendation(id: number) {
+  const { supabase } = await requireUser();
+  await deleteReminderBySource("mechanic", id);
+  const { error } = await supabase.from("mechanic_recommendations").delete().eq("id", id);
+  throwIfError(error);
 }
 
 export async function updateReminderStatus(id: number, status: ReminderStatus) {
@@ -239,6 +284,12 @@ async function upsertReminder(sourceType: string, sourceId: number, customerName
     },
     { onConflict: "user_id,source_type,source_id" }
   );
+  throwIfError(error);
+}
+
+async function deleteReminderBySource(sourceType: string, sourceId: number) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.from("reminder_tasks").delete().eq("source_type", sourceType).eq("source_id", sourceId);
   throwIfError(error);
 }
 

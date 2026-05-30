@@ -9,6 +9,7 @@ import {
   Clipboard,
   Cloud,
   Database,
+  Edit3,
   FileDown,
   Gauge,
   LogOut,
@@ -16,6 +17,7 @@ import {
   RefreshCw,
   Save,
   Settings,
+  Trash2,
   Wrench
 } from "lucide-react";
 import type {
@@ -24,6 +26,7 @@ import type {
   HotlineOrder,
   HotlineOrderInput,
   HotlineStatus,
+  MechanicRecommendation,
   MechanicRecommendationInput,
   ParsedHotlineOrder,
   ReminderStatus,
@@ -36,16 +39,13 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 const hotlineStatuses: HotlineStatus[] = ["Booked", "Arrived", "Followed Up", "Converted", "Cancelled"];
 const reminderStatuses: ReminderStatus[] = ["pending", "copied", "followed_up", "converted", "cancelled"];
 
-type AppView = "dashboard" | "parser" | "wo" | "monitor" | "reminder" | "rekap" | "template";
+type AppView = "dashboard" | "hotline" | "followup" | "rekap";
 
 const navigationItems: Array<{ id: AppView; label: string; shortLabel: string; icon: ReactNode }> = [
   { id: "dashboard", label: "Dashboard", shortLabel: "Home", icon: <Gauge size={18} /> },
-  { id: "parser", label: "Parser HO", shortLabel: "Parser", icon: <Clipboard size={18} /> },
-  { id: "wo", label: "WO Checklist", shortLabel: "WO", icon: <Wrench size={18} /> },
-  { id: "monitor", label: "Monitor HO", shortLabel: "Monitor", icon: <Database size={18} /> },
-  { id: "reminder", label: "Reminder", shortLabel: "Reminder", icon: <MessageSquareText size={18} /> },
-  { id: "rekap", label: "Rekap Bulanan", shortLabel: "Rekap", icon: <FileDown size={18} /> },
-  { id: "template", label: "Template", shortLabel: "Template", icon: <Settings size={18} /> }
+  { id: "hotline", label: "Hotline Order", shortLabel: "Hotline", icon: <Clipboard size={18} /> },
+  { id: "followup", label: "Follow-up", shortLabel: "Follow", icon: <MessageSquareText size={18} /> },
+  { id: "rekap", label: "Rekap & Setting", shortLabel: "Rekap", icon: <FileDown size={18} /> }
 ];
 
 const emptyHotline: HotlineOrderInput = {
@@ -99,6 +99,10 @@ export default function HomePage() {
   const [parsedHotlines, setParsedHotlines] = useState<ParsedHotlineRow[]>([emptyParsedHotline()]);
   const [parserWarnings, setParserWarnings] = useState<string[]>([]);
   const [recommendationForm, setRecommendationForm] = useState<MechanicRecommendationInput>(emptyRecommendation);
+  const [editingHotlineId, setEditingHotlineId] = useState<number | null>(null);
+  const [hotlineEditForm, setHotlineEditForm] = useState<HotlineOrderInput>(emptyHotline);
+  const [editingRecommendationId, setEditingRecommendationId] = useState<number | null>(null);
+  const [recommendationEditForm, setRecommendationEditForm] = useState<MechanicRecommendationInput>(emptyRecommendation);
   const [month, setMonth] = useState(todayISO().slice(0, 7));
   const [activeView, setActiveView] = useState<AppView>("dashboard");
 
@@ -216,6 +220,46 @@ export default function HomePage() {
     await loadData();
   }
 
+  function startEditHotline(order: HotlineOrder) {
+    const { id, created_at, updated_at, ...input } = order;
+    setEditingHotlineId(id);
+    setHotlineEditForm(input);
+  }
+
+  async function saveHotlineEdit() {
+    if (!editingHotlineId) {
+      return;
+    }
+    const response = await fetch("/api/hotline-orders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: editingHotlineId, input: hotlineEditForm })
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setFeedback(result.error ?? "Gagal memperbarui Hotline Order.");
+      return;
+    }
+    setFeedback("Hotline Order diperbarui.");
+    setEditingHotlineId(null);
+    setHotlineEditForm(emptyHotline);
+    await loadData();
+  }
+
+  async function deleteHotline(id: number) {
+    if (!window.confirm("Hapus Hotline Order ini? Reminder terkait juga akan dihapus.")) {
+      return;
+    }
+    const response = await fetch(`/api/hotline-orders?id=${id}`, { method: "DELETE" });
+    const result = await response.json();
+    if (!response.ok) {
+      setFeedback(result.error ?? "Gagal menghapus Hotline Order.");
+      return;
+    }
+    setFeedback("Hotline Order dihapus.");
+    await loadData();
+  }
+
   async function saveRecommendation() {
     const response = await fetch("/api/mechanic-recommendations", {
       method: "POST",
@@ -229,6 +273,46 @@ export default function HomePage() {
     }
     setFeedback("Saran mekanik masuk antrean reminder.");
     setRecommendationForm(emptyRecommendation);
+    await loadData();
+  }
+
+  function startEditRecommendation(recommendation: MechanicRecommendation) {
+    const { id, created_at, updated_at, ...input } = recommendation;
+    setEditingRecommendationId(id);
+    setRecommendationEditForm(input);
+  }
+
+  async function saveRecommendationEdit() {
+    if (!editingRecommendationId) {
+      return;
+    }
+    const response = await fetch("/api/mechanic-recommendations", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: editingRecommendationId, input: recommendationEditForm })
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setFeedback(result.error ?? "Gagal memperbarui saran mekanik.");
+      return;
+    }
+    setFeedback("Saran mekanik diperbarui.");
+    setEditingRecommendationId(null);
+    setRecommendationEditForm(emptyRecommendation);
+    await loadData();
+  }
+
+  async function deleteRecommendationItem(id: number) {
+    if (!window.confirm("Hapus saran mekanik ini? Reminder terkait juga akan dihapus.")) {
+      return;
+    }
+    const response = await fetch(`/api/mechanic-recommendations?id=${id}`, { method: "DELETE" });
+    const result = await response.json();
+    if (!response.ok) {
+      setFeedback(result.error ?? "Gagal menghapus saran mekanik.");
+      return;
+    }
+    setFeedback("Saran mekanik dihapus.");
     await loadData();
   }
 
@@ -335,7 +419,7 @@ export default function HomePage() {
             </>
           ) : null}
 
-          {activeView === "parser" ? (
+          {activeView === "hotline" ? (
             <Panel title="Parser Hotline Order" icon={<Clipboard size={18} />}>
             <div className="grid gap-3">
               <textarea
@@ -368,7 +452,7 @@ export default function HomePage() {
             </Panel>
           ) : null}
 
-          {activeView === "wo" ? (
+          {activeView === "followup" ? (
             <Panel title="Quick WO Checklist" icon={<Wrench size={18} />}>
             <div className="grid gap-3">
               <TextInput label="Nama konsumen" value={recommendationForm.customer_name} onChange={(customer_name) => setRecommendationForm({ ...recommendationForm, customer_name })} />
@@ -384,12 +468,55 @@ export default function HomePage() {
                 <Save size={16} />
                 Simpan Saran Mekanik
               </button>
+              <div className="mt-2 grid gap-3">
+                {editingRecommendationId ? (
+                  <RecommendationEditForm
+                    value={recommendationEditForm}
+                    onChange={(patch) => setRecommendationEditForm({ ...recommendationEditForm, ...patch })}
+                    onSave={saveRecommendationEdit}
+                    onCancel={() => setEditingRecommendationId(null)}
+                  />
+                ) : null}
+                <div className="grid gap-2">
+                  {data.recommendations.map((recommendation) => (
+                    <article key={recommendation.id} className="rounded-md border border-line bg-slate-50 p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold">{recommendation.customer_name}</p>
+                          <p className="text-xs text-slate-500">{recommendation.component} / {recommendation.follow_up_date}</p>
+                        </div>
+                        <Badge>{formatCurrency(recommendation.estimated_value)}</Badge>
+                      </div>
+                      <p className="mt-2 text-sm leading-6">{recommendation.recommendation}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button className="focus-ring inline-flex min-h-9 items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm" onClick={() => startEditRecommendation(recommendation)}>
+                          <Edit3 size={14} />
+                          Edit
+                        </button>
+                        <button className="focus-ring inline-flex min-h-9 items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 shadow-sm" onClick={() => deleteRecommendationItem(recommendation.id)}>
+                          <Trash2 size={14} />
+                          Hapus
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                  {!data.recommendations.length ? <EmptyState text="Belum ada saran mekanik." /> : null}
+                </div>
+              </div>
             </div>
             </Panel>
           ) : null}
 
-          {activeView === "monitor" ? (
+          {activeView === "hotline" ? (
             <Panel title="Monitor Hotline Order" icon={<Database size={18} />}>
+            {editingHotlineId ? (
+              <HotlineEditForm
+                value={hotlineEditForm}
+                onChange={(patch) => setHotlineEditForm({ ...hotlineEditForm, ...patch })}
+                onSave={saveHotlineEdit}
+                onCancel={() => setEditingHotlineId(null)}
+              />
+            ) : null}
             <div className="grid gap-3 md:hidden">
               {data.hotlines.map((order) => (
                 <article key={order.id} className="rounded-md border border-line bg-slate-50 p-3">
@@ -412,6 +539,16 @@ export default function HomePage() {
                       <option key={status}>{status}</option>
                     ))}
                   </select>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button className="focus-ring inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm" onClick={() => startEditHotline(order)}>
+                      <Edit3 size={14} />
+                      Edit
+                    </button>
+                    <button className="focus-ring inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 shadow-sm" onClick={() => deleteHotline(order.id)}>
+                      <Trash2 size={14} />
+                      Hapus
+                    </button>
+                  </div>
                 </article>
               ))}
               {!data.hotlines.length ? <EmptyState text="Belum ada Hotline Order." /> : null}
@@ -426,6 +563,7 @@ export default function HomePage() {
                     <th className="py-2 pr-3">ETA / Portal</th>
                     <th className="py-2 pr-3">Harga</th>
                     <th className="py-2 pr-3">Status</th>
+                    <th className="py-2 pr-3">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -456,6 +594,18 @@ export default function HomePage() {
                           ))}
                         </select>
                       </td>
+                      <td className="py-2 pr-3">
+                        <div className="flex gap-2">
+                          <button className="focus-ring inline-flex items-center gap-1 rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-slate-700 shadow-sm" onClick={() => startEditHotline(order)}>
+                            <Edit3 size={14} />
+                            Edit
+                          </button>
+                          <button className="focus-ring inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 shadow-sm" onClick={() => deleteHotline(order.id)}>
+                            <Trash2 size={14} />
+                            Hapus
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -465,7 +615,7 @@ export default function HomePage() {
             </Panel>
           ) : null}
 
-          {activeView === "reminder" ? (
+          {activeView === "followup" ? (
             <Panel title="Reminder WhatsApp" icon={<MessageSquareText size={18} />}>
             <div className="grid gap-3">
               {data.reminders.map((reminder) => (
@@ -558,7 +708,7 @@ export default function HomePage() {
             </Panel>
           ) : null}
 
-          {activeView === "template" ? (
+          {activeView === "rekap" ? (
             <Panel title="Settings Template" icon={<Settings size={18} />}>
             <div className="grid gap-3">
               {data.templates.map((template) => (
@@ -626,6 +776,82 @@ function ParsedHotlineList({
         <Save size={16} />
         Simpan Item Terpilih ke Database
       </button>
+    </div>
+  );
+}
+
+function HotlineEditForm({
+  value,
+  onChange,
+  onSave,
+  onCancel
+}: {
+  value: HotlineOrderInput;
+  onChange: (patch: Partial<HotlineOrderInput>) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="mb-4 rounded-md border border-brand/20 bg-teal-50 p-3">
+      <p className="mb-3 text-sm font-bold text-ink">Edit Hotline Order</p>
+      <div className="grid gap-3 md:grid-cols-2">
+        <TextInput label="No PO Dealer" value={value.dealer_po_number} onChange={(dealer_po_number) => onChange({ dealer_po_number })} />
+        <TextInput type="date" label="Tanggal PO" value={value.po_date} onChange={(po_date) => onChange({ po_date })} />
+        <TextInput label="Nama konsumen" value={value.customer_name} onChange={(customer_name) => onChange({ customer_name })} />
+        <TextInput label="No telepon" value={value.phone_number} onChange={(phone_number) => onChange({ phone_number })} />
+        <TextInput label="No part" value={value.part_number} onChange={(part_number) => onChange({ part_number })} />
+        <TextInput label="Nama part" value={value.part_name} onChange={(part_name) => onChange({ part_name })} />
+        <TextInput label="Qty order" value={String(value.order_qty || "")} onChange={(orderQty) => onChange({ order_qty: Number(orderQty) || 0 })} />
+        <TextInput label="Harga" value={String(value.price || "")} onChange={(price) => onChange({ price: parseMoney(price) })} />
+        <TextInput type="date" label="ETA revisi" value={value.eta_revision} onChange={(eta_revision) => onChange({ eta_revision })} />
+        <TextInput label="Status portal" value={value.portal_status} onChange={(portal_status) => onChange({ portal_status })} />
+        <SelectInput label="Status REMINDRA" value={value.status} options={hotlineStatuses} onChange={(status) => onChange({ status: status as HotlineStatus })} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm" onClick={onSave}>
+          <Save size={16} />
+          Simpan Perubahan
+        </button>
+        <button className="focus-ring min-h-10 rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm" onClick={onCancel}>
+          Batal
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RecommendationEditForm({
+  value,
+  onChange,
+  onSave,
+  onCancel
+}: {
+  value: MechanicRecommendationInput;
+  onChange: (patch: Partial<MechanicRecommendationInput>) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="rounded-md border border-brand/20 bg-teal-50 p-3">
+      <p className="mb-3 text-sm font-bold text-ink">Edit Saran Mekanik</p>
+      <div className="grid gap-3 md:grid-cols-2">
+        <TextInput label="Nama konsumen" value={value.customer_name} onChange={(customer_name) => onChange({ customer_name })} />
+        <TextInput label="No telepon" value={value.phone_number} onChange={(phone_number) => onChange({ phone_number })} />
+        <TextInput label="Kendaraan" value={value.vehicle_info} onChange={(vehicle_info) => onChange({ vehicle_info })} />
+        <TextInput label="Komponen" value={value.component} onChange={(component) => onChange({ component })} />
+        <TextInput label="Rekomendasi mekanik" value={value.recommendation} onChange={(recommendation) => onChange({ recommendation })} />
+        <TextInput type="date" label="Tanggal follow-up" value={value.follow_up_date} onChange={(follow_up_date) => onChange({ follow_up_date })} />
+        <TextInput label="Estimasi nilai" value={String(value.estimated_value || "")} onChange={(estimatedValue) => onChange({ estimated_value: parseMoney(estimatedValue) })} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm" onClick={onSave}>
+          <Save size={16} />
+          Simpan Perubahan
+        </button>
+        <button className="focus-ring min-h-10 rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm" onClick={onCancel}>
+          Batal
+        </button>
+      </div>
     </div>
   );
 }
