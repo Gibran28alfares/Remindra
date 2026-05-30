@@ -14,9 +14,20 @@
 3. Add environment variables:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` for WhatsApp webhook status updates
+   - `WHATSAPP_ACCESS_TOKEN`
+   - `WHATSAPP_PHONE_NUMBER_ID`
+   - `WHATSAPP_GRAPH_API_VERSION`
+   - `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
 4. Deploy.
 
-## 3. Smartphone Use
+## 3. WhatsApp Cloud API
+
+1. Configure the Meta WhatsApp webhook URL to `/api/whatsapp/webhook` on the Vercel production domain.
+2. Use the same verify token as `WHATSAPP_WEBHOOK_VERIFY_TOKEN`.
+3. Subscribe the app to message status updates so REMINDRA can update `sent`, `delivered`, `read`, and `failed`.
+
+## 4. Smartphone Use
 
 Open the Vercel production URL from the smartphone browser and login with the Supabase Auth user.
 

@@ -1,9 +1,10 @@
 export type HotlineStatus = "Booked" | "Arrived" | "Followed Up" | "Converted" | "Cancelled";
-export type FollowUpStatus = "pending" | "copied" | "followed_up" | "converted" | "cancelled";
-export type RecommendationStatus = "pending" | "copied" | "followed_up" | "converted" | "cancelled";
-export type ReminderStatus = "pending" | "copied" | "followed_up" | "converted" | "cancelled";
+export type FollowUpStatus = "pending" | "copied" | "queued" | "sending" | "sent" | "delivered" | "read" | "failed" | "followed_up" | "converted" | "cancelled";
+export type RecommendationStatus = "pending" | "copied" | "queued" | "sending" | "sent" | "delivered" | "read" | "failed" | "followed_up" | "converted" | "cancelled";
+export type ReminderStatus = "pending" | "copied" | "queued" | "sending" | "sent" | "delivered" | "read" | "failed" | "followed_up" | "converted" | "cancelled";
 export type ReminderSourceType = "hotline" | "mechanic";
 export type TemplateType = "hotline_arrived" | "mechanic_follow_up";
+export type WhatsappDeliveryStatus = "draft" | "queued" | "sending" | "sent" | "delivered" | "read" | "failed";
 
 export interface HotlineOrder {
   id: number;
@@ -78,9 +79,28 @@ export interface MessageTemplate {
   updated_at: string;
 }
 
+export interface WhatsappMessageLog {
+  id: number;
+  reminder_id: number | null;
+  source_type: ReminderSourceType;
+  source_id: number;
+  phone_number: string;
+  message: string;
+  wa_message_id: string;
+  delivery_status: WhatsappDeliveryStatus;
+  error_message: string;
+  sent_at: string;
+  delivered_at: string;
+  read_at: string;
+  failed_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AppData {
   hotlines: HotlineOrder[];
   recommendations: MechanicRecommendation[];
   reminders: ReminderTask[];
   templates: MessageTemplate[];
+  whatsapp_logs: WhatsappMessageLog[];
 }

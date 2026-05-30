@@ -8,7 +8,9 @@ import type {
   MessageTemplate,
   ReminderStatus,
   ReminderTask,
-  TemplateType
+  TemplateType,
+  WhatsappDeliveryStatus,
+  WhatsappMessageLog
 } from "@/lib/types";
 import { todayISO } from "@/lib/format";
 import { requireUser } from "@/lib/supabase/server";
@@ -30,23 +32,26 @@ export async function getAppData(): Promise<AppData> {
   const { supabase } = await requireUser();
   await ensureDefaultTemplates();
 
-  const [hotlines, recommendations, reminders, templates] = await Promise.all([
+  const [hotlines, recommendations, reminders, templates, whatsappLogs] = await Promise.all([
     supabase.from("hotline_orders").select("*").order("created_at", { ascending: false }),
     supabase.from("mechanic_recommendations").select("*").order("created_at", { ascending: false }),
     supabase.from("reminder_tasks").select("*").order("due_date", { ascending: true }).order("created_at", { ascending: false }),
-    supabase.from("message_templates").select("*").order("type", { ascending: true })
+    supabase.from("message_templates").select("*").order("type", { ascending: true }),
+    supabase.from("whatsapp_message_logs").select("*").order("created_at", { ascending: false }).limit(100)
   ]);
 
   throwIfError(hotlines.error);
   throwIfError(recommendations.error);
   throwIfError(reminders.error);
   throwIfError(templates.error);
+  throwIfError(whatsappLogs.error);
 
   return {
     hotlines: ((hotlines.data ?? []) as HotlineOrder[]).map(normalizeHotlineRow),
     recommendations: (recommendations.data ?? []) as MechanicRecommendation[],
     reminders: (reminders.data ?? []) as ReminderTask[],
-    templates: (templates.data ?? []) as MessageTemplate[]
+    templates: (templates.data ?? []) as MessageTemplate[],
+    whatsapp_logs: ((whatsappLogs.data ?? []) as WhatsappMessageLog[]).map(normalizeWhatsappLogRow)
   };
 }
 
@@ -152,6 +157,114 @@ export async function updateReminderStatus(id: number, status: ReminderStatus) {
   return data as ReminderTask;
 }
 
+export async function queueWhatsappReminder(id: number, override = false) {
+  const { supabase } = await requireUser();
+  const reminder = await getReminderById(id);
+  await assertReminderCanSend(reminder, override);
+
+  const now = new Date().toISOString();
+  const [{ data: updatedReminder, error: reminderError }, { data: log, error: logError }] = await Promise.all([
+    supabase.from("reminder_tasks").update({ status: "queued", updated_at: now }).eq("id", id).select("*").single(),
+    supabase
+      .from("whatsapp_message_logs")
+      .insert({
+        reminder_id: reminder.id,
+        source_type: reminder.source_type,
+        source_id: reminder.source_id,
+        phone_number: normalizeWhatsappPhone(reminder.phone_number),
+        message: reminder.message,
+        delivery_status: "queued",
+        updated_at: now
+      })
+      .select("*")
+      .single()
+  ]);
+  throwIfError(reminderError);
+  throwIfError(logError);
+
+  return {
+    reminder: updatedReminder as ReminderTask,
+    log: normalizeWhatsappLogRow(log as WhatsappMessageLog)
+  };
+}
+
+export async function markWhatsappSending(reminderId: number, logId: number) {
+  const { supabase } = await requireUser();
+  const now = new Date().toISOString();
+  const [reminderResult, logResult] = await Promise.all([
+    supabase.from("reminder_tasks").update({ status: "sending", updated_at: now }).eq("id", reminderId).select("*").single(),
+    supabase.from("whatsapp_message_logs").update({ delivery_status: "sending", updated_at: now }).eq("id", logId).select("*").single()
+  ]);
+  throwIfError(reminderResult.error);
+  throwIfError(logResult.error);
+  return {
+    reminder: reminderResult.data as ReminderTask,
+    log: normalizeWhatsappLogRow(logResult.data as WhatsappMessageLog)
+  };
+}
+
+export async function markWhatsappSent(reminderId: number, logId: number, waMessageId: string) {
+  const { supabase } = await requireUser();
+  const now = new Date().toISOString();
+  const reminder = await getReminderById(reminderId);
+  const [reminderResult, logResult] = await Promise.all([
+    supabase.from("reminder_tasks").update({ status: "sent", updated_at: now }).eq("id", reminderId).select("*").single(),
+    supabase
+      .from("whatsapp_message_logs")
+      .update({ delivery_status: "sent", wa_message_id: waMessageId, sent_at: now, updated_at: now })
+      .eq("id", logId)
+      .select("*")
+      .single()
+  ]);
+  throwIfError(reminderResult.error);
+  throwIfError(logResult.error);
+  await markSourceFollowedUp(reminder);
+  return {
+    reminder: reminderResult.data as ReminderTask,
+    log: normalizeWhatsappLogRow(logResult.data as WhatsappMessageLog)
+  };
+}
+
+export async function markWhatsappFailed(reminderId: number, logId: number, errorMessage: string) {
+  const { supabase } = await requireUser();
+  const now = new Date().toISOString();
+  const [reminderResult, logResult] = await Promise.all([
+    supabase.from("reminder_tasks").update({ status: "failed", updated_at: now }).eq("id", reminderId).select("*").single(),
+    supabase
+      .from("whatsapp_message_logs")
+      .update({ delivery_status: "failed", error_message: errorMessage, failed_at: now, updated_at: now })
+      .eq("id", logId)
+      .select("*")
+      .single()
+  ]);
+  throwIfError(reminderResult.error);
+  throwIfError(logResult.error);
+  return {
+    reminder: reminderResult.data as ReminderTask,
+    log: normalizeWhatsappLogRow(logResult.data as WhatsappMessageLog)
+  };
+}
+
+export async function updateWhatsappDeliveryByMessageId(waMessageId: string, deliveryStatus: WhatsappDeliveryStatus, errorMessage = "") {
+  const { supabase } = await requireUser();
+  const now = new Date().toISOString();
+  const timestampField = deliveryStatus === "delivered" ? { delivered_at: now } : deliveryStatus === "read" ? { read_at: now } : deliveryStatus === "failed" ? { failed_at: now } : {};
+  const { data: log, error: logError } = await supabase
+    .from("whatsapp_message_logs")
+    .update({ delivery_status: deliveryStatus, error_message: errorMessage, updated_at: now, ...timestampField })
+    .eq("wa_message_id", waMessageId)
+    .select("*")
+    .single();
+  throwIfError(logError);
+
+  const normalizedLog = normalizeWhatsappLogRow(log as WhatsappMessageLog);
+  if (normalizedLog.reminder_id && ["delivered", "read", "failed"].includes(deliveryStatus)) {
+    const { error: reminderError } = await supabase.from("reminder_tasks").update({ status: deliveryStatus, updated_at: now }).eq("id", normalizedLog.reminder_id);
+    throwIfError(reminderError);
+  }
+  return normalizedLog;
+}
+
 export async function updateTemplate(type: TemplateType, body: string) {
   const { supabase } = await requireUser();
   await ensureDefaultTemplates();
@@ -213,6 +326,65 @@ function normalizeHotlineRow(order: HotlineOrder): HotlineOrder {
     plate_number: order.plate_number ?? "",
     vehicle_type: order.vehicle_type ?? ""
   };
+}
+
+function normalizeWhatsappLogRow(log: WhatsappMessageLog): WhatsappMessageLog {
+  return {
+    ...log,
+    reminder_id: log.reminder_id ?? null,
+    wa_message_id: log.wa_message_id ?? "",
+    error_message: log.error_message ?? "",
+    sent_at: log.sent_at ?? "",
+    delivered_at: log.delivered_at ?? "",
+    read_at: log.read_at ?? "",
+    failed_at: log.failed_at ?? ""
+  };
+}
+
+function normalizeWhatsappPhone(phoneNumber: string) {
+  const digits = phoneNumber.replace(/\D/g, "");
+  if (digits.startsWith("0")) {
+    return `62${digits.slice(1)}`;
+  }
+  return digits;
+}
+
+async function getReminderById(id: number) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.from("reminder_tasks").select("*").eq("id", id).single();
+  throwIfError(error);
+  return data as ReminderTask;
+}
+
+async function assertReminderCanSend(reminder: ReminderTask, override: boolean) {
+  const { supabase } = await requireUser();
+
+  if (reminder.source_type === "hotline") {
+    const { data, error } = await supabase.from("hotline_orders").select("status").eq("id", reminder.source_id).single();
+    throwIfError(error);
+    if ((data as Pick<HotlineOrder, "status">).status !== "Arrived") {
+      throw new Error("Pesan Hotline Order hanya bisa dikirim otomatis saat status Arrived.");
+    }
+    return;
+  }
+
+  if (!override && reminder.due_date > todayISO()) {
+    throw new Error("Tanggal follow-up WO belum jatuh tempo. Gunakan override manual bila tetap ingin mengirim.");
+  }
+}
+
+async function markSourceFollowedUp(reminder: ReminderTask) {
+  const { supabase } = await requireUser();
+  const now = new Date().toISOString();
+
+  if (reminder.source_type === "hotline") {
+    const { error } = await supabase.from("hotline_orders").update({ follow_up_status: "sent", updated_at: now }).eq("id", reminder.source_id);
+    throwIfError(error);
+    return;
+  }
+
+  const { error } = await supabase.from("mechanic_recommendations").update({ status: "sent", updated_at: now }).eq("id", reminder.source_id);
+  throwIfError(error);
 }
 
 async function ensureDefaultTemplates() {

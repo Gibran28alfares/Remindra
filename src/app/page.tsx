@@ -33,13 +33,14 @@ import type {
   ParsedHotlineOrder,
   ReminderStatus,
   ReminderTask,
-  TemplateType
+  TemplateType,
+  WhatsappMessageLog
 } from "@/lib/types";
 import { formatCurrency, parseMoney, todayISO } from "@/lib/format";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const hotlineStatuses: HotlineStatus[] = ["Booked", "Arrived", "Followed Up", "Converted", "Cancelled"];
-const reminderStatuses: ReminderStatus[] = ["pending", "copied", "followed_up", "converted", "cancelled"];
+const reminderStatuses: ReminderStatus[] = ["pending", "copied", "queued", "sending", "sent", "delivered", "read", "failed", "followed_up", "converted", "cancelled"];
 
 type AppView = "dashboard" | "hotline" | "followup" | "rekap";
 type PendingDelete = { type: "hotline" | "recommendation"; id: number; label: string } | null;
@@ -101,7 +102,7 @@ const emptyRecommendation: MechanicRecommendationInput = {
 
 export default function HomePage() {
   const router = useRouter();
-  const [data, setData] = useState<AppData>({ hotlines: [], recommendations: [], reminders: [], templates: [] });
+  const [data, setData] = useState<AppData>({ hotlines: [], recommendations: [], reminders: [], templates: [], whatsapp_logs: [] });
   const [loading, setLoading] = useState(true);
   const [rawPortalText, setRawPortalText] = useState("");
   const [parserLoading, setParserLoading] = useState(false);
@@ -368,6 +369,22 @@ export default function HomePage() {
     await navigator.clipboard.writeText(reminder.message);
     await updateReminder(reminder.id, "copied");
     setFeedback(`Pesan untuk ${reminder.customer_name} disalin.`);
+  }
+
+  async function sendWhatsappReminder(reminder: ReminderTask, override = false) {
+    const response = await fetch("/api/whatsapp/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reminder_id: reminder.id, override })
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setFeedback(result.error ?? "Gagal mengirim WhatsApp.");
+      await loadData();
+      return;
+    }
+    setFeedback(`WhatsApp untuk ${reminder.customer_name} terkirim ke API.`);
+    await loadData();
   }
 
   function getWhatsAppUrl(reminder: ReminderTask) {
@@ -723,11 +740,24 @@ export default function HomePage() {
                       <p className="text-xs text-slate-500">
                         {reminder.source_type} / jatuh tempo {reminder.due_date}
                       </p>
+                      {getReminderWhatsappLog(data.whatsapp_logs, reminder.id) ? (
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                          WA: {getReminderWhatsappLog(data.whatsapp_logs, reminder.id)?.delivery_status}
+                          {getReminderWhatsappLog(data.whatsapp_logs, reminder.id)?.error_message ? ` / ${getReminderWhatsappLog(data.whatsapp_logs, reminder.id)?.error_message}` : ""}
+                        </p>
+                      ) : null}
                     </div>
                     <Badge>{reminder.status}</Badge>
                   </div>
                   <p className="mt-2 text-sm leading-6">{reminder.message}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      className="focus-ring min-h-9 rounded-md bg-accent px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-amber-800 disabled:opacity-60"
+                      onClick={() => void sendWhatsappReminder(reminder)}
+                      disabled={reminder.status === "queued" || reminder.status === "sending"}
+                    >
+                      {reminder.status === "failed" ? "Retry WA" : "Kirim WA"}
+                    </button>
                     <button className="focus-ring min-h-9 rounded-md bg-brand px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-teal-800" onClick={() => copyReminder(reminder)}>
                       Copy Pesan
                     </button>
@@ -1180,6 +1210,10 @@ function normalizePhone(phone: string) {
     return `62${digits.slice(1)}`;
   }
   return digits;
+}
+
+function getReminderWhatsappLog(logs: WhatsappMessageLog[], reminderId: number) {
+  return logs.find((log) => log.reminder_id === reminderId);
 }
 
 function Metric({ icon, label, value, tone }: { icon: ReactNode; label: string; value: string; tone: "brand" | "amber" | "slate" | "blue" | "green" }) {
