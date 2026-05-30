@@ -383,7 +383,33 @@ export default function HomePage() {
 
           {activeView === "monitor" ? (
             <Panel title="Monitor Hotline Order" icon={<Database size={18} />}>
-            <div className="overflow-x-auto">
+            <div className="grid gap-3 md:hidden">
+              {data.hotlines.map((order) => (
+                <article key={order.id} className="rounded-md border border-line bg-slate-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-ink">{order.customer_name}</p>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">{order.dealer_po_number || "-"}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-line bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">{order.status}</span>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-sm">
+                    <InfoRow label="No Tlp" value={order.phone_number || "-"} />
+                    <InfoRow label="Part" value={`${order.part_number || "-"}${order.part_name ? ` / ${order.part_name}` : ""}`} />
+                    <InfoRow label="ETA" value={order.eta_revision || "-"} />
+                    <InfoRow label="Portal" value={`${order.portal_status || "-"}${order.progress_percent ? ` / ${order.progress_percent}` : ""}`} />
+                    <InfoRow label="Harga" value={formatCurrency(order.price)} />
+                  </div>
+                  <select className="focus-ring mt-3 min-h-10 w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold shadow-sm" value={order.status} onChange={(event) => updateHotline(order, event.target.value as HotlineStatus)}>
+                    {hotlineStatuses.map((status) => (
+                      <option key={status}>{status}</option>
+                    ))}
+                  </select>
+                </article>
+              ))}
+              {!data.hotlines.length ? <EmptyState text="Belum ada Hotline Order." /> : null}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[860px] border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-line bg-slate-50 text-xs uppercase text-slate-500">
@@ -474,7 +500,26 @@ export default function HomePage() {
               </a>
             </div>
             <p className="mt-3 text-sm font-semibold">Total periode: {formatCurrency(monthlyTotal)}</p>
-            <div className="mt-3 overflow-x-auto">
+            <div className="mt-3 grid gap-3 md:hidden">
+              {monthlyOrders.map((order, index) => (
+                <article key={order.id} className="rounded-md border border-line bg-slate-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-ink">{index + 1}. {order.customer_name}</p>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">{order.dealer_po_number || "-"}</p>
+                    </div>
+                    <span className="shrink-0 text-sm font-bold text-brand">{formatCurrency(order.price)}</span>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-sm">
+                    <InfoRow label="Tanggal" value={order.po_date || "-"} />
+                    <InfoRow label="No Tlp" value={order.phone_number || "-"} />
+                    <InfoRow label="Part" value={order.part_number || "-"} />
+                  </div>
+                </article>
+              ))}
+              {!monthlyOrders.length ? <EmptyState text="Belum ada data di periode ini." /> : null}
+            </div>
+            <div className="mt-3 hidden overflow-x-auto md:block">
               <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                   <tr className="border-b border-line">
@@ -662,6 +707,15 @@ function SummaryBox({ label, value }: { label: string; value: string }) {
     <div className="rounded-md border border-line bg-slate-50 p-4">
       <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
       <p className="mt-2 text-2xl font-bold text-ink">{value}</p>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[88px_1fr] gap-3">
+      <span className="text-xs font-semibold uppercase text-slate-500">{label}</span>
+      <span className="min-w-0 break-words font-medium text-ink">{value}</span>
     </div>
   );
 }
