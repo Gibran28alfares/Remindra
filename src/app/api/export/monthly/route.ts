@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import { getMonthlyHotlines } from "@/lib/db";
+import { getAppData } from "@/lib/db";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get("month") ?? new Date().toISOString().slice(0, 7);
-    const orders = await getMonthlyHotlines(month);
+    const visibleIds = parseIds(searchParams.get("ids"));
+    const { hotlines } = await getAppData();
+    const orders = visibleIds.length
+      ? hotlines.filter((order) => visibleIds.includes(order.id))
+      : hotlines.filter((order) => order.po_date.startsWith(month));
     const rows = [
       ["No", "No PO Dealer", "Tgl PO", "Nama Konsumen", "No Tlp", "No Part", "Nama Part", "Qty", "Price", "ETA Revisi", "Status Portal", "Status REMINDRA"],
       ...orders.map((order, index) => [
@@ -35,6 +39,16 @@ export async function GET(request: Request) {
     const message = error instanceof Error ? error.message : "Gagal membuat export bulanan.";
     return NextResponse.json({ error: message }, { status: message === "Unauthorized" ? 401 : 400 });
   }
+}
+
+function parseIds(rawIds: string | null) {
+  if (!rawIds) {
+    return [];
+  }
+  return rawIds
+    .split(",")
+    .map((id) => Number(id))
+    .filter((id) => Number.isInteger(id) && id > 0);
 }
 
 function escapeCsv(value: string) {

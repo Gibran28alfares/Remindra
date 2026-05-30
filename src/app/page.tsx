@@ -121,6 +121,13 @@ export default function HomePage() {
 
   const monthlyOrders = useMemo(() => data.hotlines.filter((order) => order.po_date.startsWith(month)), [data.hotlines, month]);
   const monthlyTotal = monthlyOrders.reduce((total, order) => total + order.price, 0);
+  const monthlyExportUrl = useMemo(() => {
+    const params = new URLSearchParams({ month });
+    if (monthlyOrders.length) {
+      params.set("ids", monthlyOrders.map((order) => String(order.id)).join(","));
+    }
+    return `/api/export/monthly?${params.toString()}`;
+  }, [month, monthlyOrders]);
 
   useEffect(() => {
     void loadData();
@@ -494,7 +501,7 @@ export default function HomePage() {
             <Panel title="Rekap Bulanan" icon={<FileDown size={18} />}>
             <div className="flex flex-wrap items-end gap-3">
               <TextInput type="month" label="Periode" value={month} onChange={setMonth} />
-              <a className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-800" href={`/api/export/monthly?month=${month}`}>
+              <a className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-800" href={monthlyExportUrl}>
                 <FileDown size={16} />
                 Export CSV
               </a>
