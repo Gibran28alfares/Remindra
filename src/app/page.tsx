@@ -40,7 +40,17 @@ import { formatCurrency, parseMoney, todayISO } from "@/lib/format";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const hotlineStatuses: HotlineStatus[] = ["Booked", "Arrived", "Followed Up", "Converted", "Cancelled"];
-const reminderStatuses: ReminderStatus[] = ["pending", "copied", "queued", "sending", "sent", "delivered", "read", "failed", "followed_up", "converted", "cancelled"];
+const hotlineActionStatuses: Array<{ status: HotlineStatus; label: string }> = [
+  { status: "Arrived", label: "Tandai Arrived" },
+  { status: "Followed Up", label: "Followed Up" },
+  { status: "Converted", label: "Converted" },
+  { status: "Cancelled", label: "Cancel" }
+];
+const reminderActionStatuses: Array<{ status: ReminderStatus; label: string }> = [
+  { status: "followed_up", label: "Followed Up" },
+  { status: "converted", label: "Converted" },
+  { status: "cancelled", label: "Cancel" }
+];
 
 type AppView = "dashboard" | "hotline" | "followup" | "rekap";
 type PendingDelete = { type: "hotline" | "recommendation"; id: number; label: string } | null;
@@ -490,7 +500,7 @@ export default function HomePage() {
                           <p className="font-semibold">{reminder.customer_name}</p>
                           <p className="text-xs text-slate-500">{reminder.due_date}</p>
                         </div>
-                        <Badge>{reminder.status}</Badge>
+                        <StatusBadge status={reminder.status} />
                       </div>
                     ))}
                     {!data.reminders.length ? <EmptyState text="Belum ada reminder." /> : null}
@@ -639,7 +649,7 @@ export default function HomePage() {
                       <p className="truncate text-sm font-bold text-ink">{order.customer_name}</p>
                       <p className="mt-1 text-xs font-semibold text-slate-500">{order.dealer_po_number || "-"}</p>
                     </div>
-                    <span className="shrink-0 rounded-full border border-line bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">{order.status}</span>
+                    <StatusBadge status={order.status} />
                   </div>
                   <div className="mt-3 grid gap-2 text-sm">
                     <InfoRow label="No Tlp" value={order.phone_number || "-"} />
@@ -648,11 +658,7 @@ export default function HomePage() {
                     <InfoRow label="Portal" value={`${order.portal_status || "-"}${order.progress_percent ? ` / ${order.progress_percent}` : ""}`} />
                     <InfoRow label="Harga" value={formatCurrency(order.price)} />
                   </div>
-                  <select className="focus-ring mt-3 min-h-10 w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold shadow-sm" value={order.status} onChange={(event) => updateHotline(order, event.target.value as HotlineStatus)}>
-                    {hotlineStatuses.map((status) => (
-                      <option key={status}>{status}</option>
-                    ))}
-                  </select>
+                  <HotlineStatusActions current={order.status} onSelect={(status) => updateHotline(order, status)} className="mt-3" />
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <button className="focus-ring inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm" onClick={() => startEditHotline(order)}>
                       <Edit3 size={14} />
@@ -702,14 +708,11 @@ export default function HomePage() {
                       </td>
                       <td className="py-2 pr-3">{formatCurrency(order.price)}</td>
                       <td className="py-2 pr-3">
-                        <select className="focus-ring rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold shadow-sm" value={order.status} onChange={(event) => updateHotline(order, event.target.value as HotlineStatus)}>
-                          {hotlineStatuses.map((status) => (
-                            <option key={status}>{status}</option>
-                          ))}
-                        </select>
+                        <StatusBadge status={order.status} />
                       </td>
                       <td className="py-2 pr-3">
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          <HotlineStatusActions current={order.status} onSelect={(status) => updateHotline(order, status)} compact />
                           <button className="focus-ring inline-flex items-center gap-1 rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-slate-700 shadow-sm" onClick={() => startEditHotline(order)}>
                             <Edit3 size={14} />
                             Edit
@@ -740,14 +743,9 @@ export default function HomePage() {
                       <p className="text-xs text-slate-500">
                         {reminder.source_type} / jatuh tempo {reminder.due_date}
                       </p>
-                      {getReminderWhatsappLog(data.whatsapp_logs, reminder.id) ? (
-                        <p className="mt-1 text-xs font-semibold text-slate-500">
-                          WA: {getReminderWhatsappLog(data.whatsapp_logs, reminder.id)?.delivery_status}
-                          {getReminderWhatsappLog(data.whatsapp_logs, reminder.id)?.error_message ? ` / ${getReminderWhatsappLog(data.whatsapp_logs, reminder.id)?.error_message}` : ""}
-                        </p>
-                      ) : null}
+                      <WhatsappDeliveryLine log={getReminderWhatsappLog(data.whatsapp_logs, reminder.id)} />
                     </div>
-                    <Badge>{reminder.status}</Badge>
+                    <StatusBadge status={reminder.status} />
                   </div>
                   <p className="mt-2 text-sm leading-6">{reminder.message}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -765,11 +763,7 @@ export default function HomePage() {
                       <Send size={14} />
                       Buka WA
                     </a>
-                    <select className="focus-ring rounded-md border border-line bg-white px-2 py-1 text-xs shadow-sm" value={reminder.status} onChange={(event) => updateReminder(reminder.id, event.target.value as ReminderStatus)}>
-                      {reminderStatuses.map((status) => (
-                        <option key={status}>{status}</option>
-                      ))}
-                    </select>
+                    <ReminderStatusActions current={reminder.status} onSelect={(status) => updateReminder(reminder.id, status)} />
                   </div>
                 </article>
               ))}
@@ -1270,6 +1264,110 @@ function SelectInput({ label, value, options, onChange }: { label: string; value
 
 function Badge({ children }: { children: ReactNode }) {
   return <span className="rounded-full border border-line bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-sm">{children}</span>;
+}
+
+function StatusBadge({ status }: { status: HotlineStatus | ReminderStatus | string }) {
+  return (
+    <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold shadow-sm ${getStatusTone(status)}`}>
+      {getStatusLabel(status)}
+    </span>
+  );
+}
+
+function HotlineStatusActions({ current, onSelect, compact = false, className = "" }: { current: HotlineStatus; onSelect: (status: HotlineStatus) => void; compact?: boolean; className?: string }) {
+  return (
+    <div className={`flex flex-wrap gap-2 ${className}`}>
+      {hotlineActionStatuses.map((item) => (
+        <StatusActionButton
+          key={item.status}
+          active={current === item.status}
+          danger={item.status === "Cancelled"}
+          label={compact && item.status === "Arrived" ? "Arrived" : item.label}
+          onClick={() => onSelect(item.status)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ReminderStatusActions({ current, onSelect }: { current: ReminderStatus; onSelect: (status: ReminderStatus) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {reminderActionStatuses.map((item) => (
+        <StatusActionButton
+          key={item.status}
+          active={current === item.status}
+          danger={item.status === "cancelled"}
+          label={item.label}
+          onClick={() => onSelect(item.status)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function StatusActionButton({ active, danger = false, label, onClick }: { active: boolean; danger?: boolean; label: string; onClick: () => void }) {
+  const baseClass = "focus-ring inline-flex min-h-9 items-center justify-center rounded-md border px-3 py-2 text-xs font-semibold shadow-sm transition disabled:cursor-default";
+  const idleClass = danger
+    ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+    : "border-line bg-white text-slate-700 hover:bg-slate-50";
+  const activeClass = danger
+    ? "border-red-600 bg-red-600 text-white"
+    : "border-brand bg-brand text-white";
+
+  return (
+    <button type="button" className={`${baseClass} ${active ? activeClass : idleClass}`} disabled={active} aria-pressed={active} onClick={onClick}>
+      {label}
+    </button>
+  );
+}
+
+function WhatsappDeliveryLine({ log }: { log?: WhatsappMessageLog }) {
+  if (!log) {
+    return null;
+  }
+
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
+      <span>WA</span>
+      <StatusBadge status={log.delivery_status} />
+      {log.error_message ? <span className="text-red-600">{log.error_message}</span> : null}
+    </div>
+  );
+}
+
+function getStatusTone(status: string) {
+  if (["Converted", "converted", "Followed Up", "followed_up", "delivered", "read"].includes(status)) {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+  if (["Arrived", "sent"].includes(status)) {
+    return "border-sky-200 bg-sky-50 text-sky-700";
+  }
+  if (["pending", "queued", "sending", "Booked", "copied"].includes(status)) {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+  if (["Cancelled", "cancelled", "failed"].includes(status)) {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+  return "border-line bg-white text-slate-600";
+}
+
+function getStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    followed_up: "Followed Up",
+    copied: "Copied",
+    converted: "Converted",
+    cancelled: "Cancelled",
+    pending: "Pending",
+    queued: "Queued",
+    sending: "Sending",
+    sent: "Sent",
+    delivered: "Delivered",
+    read: "Read",
+    failed: "Failed"
+  };
+
+  return labels[status] ?? status;
 }
 
 function StatusPill({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
