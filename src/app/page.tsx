@@ -16,8 +16,10 @@ import {
   MessageSquareText,
   RefreshCw,
   Save,
+  Send,
   Settings,
   Trash2,
+  Upload,
   Wrench
 } from "lucide-react";
 import type {
@@ -41,6 +43,13 @@ const reminderStatuses: ReminderStatus[] = ["pending", "copied", "followed_up", 
 
 type AppView = "dashboard" | "hotline" | "followup" | "rekap";
 type PendingDelete = { type: "hotline" | "recommendation"; id: number; label: string } | null;
+type GreensysPreviewRow = {
+  id: string;
+  customer_name: string;
+  phone_number: string;
+  vehicle_info: string;
+  plate_number: string;
+};
 
 const navigationItems: Array<{ id: AppView; label: string; shortLabel: string; icon: ReactNode }> = [
   { id: "dashboard", label: "Dashboard", shortLabel: "Home", icon: <Gauge size={18} /> },
@@ -105,6 +114,8 @@ export default function HomePage() {
   const [editingRecommendationId, setEditingRecommendationId] = useState<number | null>(null);
   const [recommendationEditForm, setRecommendationEditForm] = useState<MechanicRecommendationInput>(emptyRecommendation);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
+  const [greensysRows, setGreensysRows] = useState<GreensysPreviewRow[]>([]);
+  const [greensysFileName, setGreensysFileName] = useState("");
   const [month, setMonth] = useState(todayISO().slice(0, 7));
   const [activeView, setActiveView] = useState<AppView>("dashboard");
 
@@ -116,12 +127,19 @@ export default function HomePage() {
     const totalReminder = data.reminders.length || 1;
     const hoValue = data.hotlines.reduce((total, order) => total + order.price, 0);
     const woValue = data.recommendations.reduce((total, item) => total + item.estimated_value, 0);
+    const convertedHotlineValue = data.hotlines.filter((order) => order.status === "Converted").reduce((total, order) => total + order.price, 0);
+    const convertedWoValue = data.recommendations.filter((item) => item.status === "converted").reduce((total, item) => total + item.estimated_value, 0);
+    const pendingRecommendations = data.recommendations.filter((item) => item.status === "pending").length;
     return {
       activeHotlines,
       pendingReminders,
       followedUp,
+      pendingRecommendations,
+      sentReminders: followedUp,
       conversionRate: Math.round((converted / totalReminder) * 100),
-      savedRevenue: hoValue + woValue
+      savedRevenue: hoValue + woValue,
+      convertedRevenue: convertedHotlineValue + convertedWoValue,
+      activeHotlineValue: data.hotlines.filter((order) => !["Converted", "Cancelled"].includes(order.status)).reduce((total, order) => total + order.price, 0)
     };
   }, [data]);
 
@@ -275,6 +293,27 @@ export default function HomePage() {
     await loadData();
   }
 
+  async function importGreensysFile(file: File | null) {
+    if (!file) {
+      return;
+    }
+    const content = await file.text();
+    const rows = parseGreensysPreview(content);
+    setGreensysFileName(file.name);
+    setGreensysRows(rows);
+    setFeedback(rows.length ? `${rows.length} data konsumen terbaca dari ${file.name}.` : "File terbaca, tapi data konsumen belum ditemukan.");
+  }
+
+  function useGreensysRow(row: GreensysPreviewRow) {
+    setRecommendationForm({
+      ...recommendationForm,
+      customer_name: row.customer_name,
+      phone_number: row.phone_number,
+      vehicle_info: row.vehicle_info || row.plate_number
+    });
+    setFeedback(`Data ${row.customer_name} dipakai untuk WO Checklist.`);
+  }
+
   function startEditRecommendation(recommendation: MechanicRecommendation) {
     const { id, created_at, updated_at, ...input } = recommendation;
     setEditingRecommendationId(id);
@@ -329,6 +368,12 @@ export default function HomePage() {
     await navigator.clipboard.writeText(reminder.message);
     await updateReminder(reminder.id, "copied");
     setFeedback(`Pesan untuk ${reminder.customer_name} disalin.`);
+  }
+
+  function getWhatsAppUrl(reminder: ReminderTask) {
+    const phone = reminder.phone_number.replace(/\D/g, "");
+    const normalizedPhone = phone.startsWith("0") ? `62${phone.slice(1)}` : phone;
+    return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(reminder.message)}`;
   }
 
   async function updateReminder(id: number, status: ReminderStatus) {
@@ -410,6 +455,16 @@ export default function HomePage() {
                     <SummaryBox label="Reminder" value={String(data.reminders.length)} />
                   </div>
                 </Panel>
+                <Panel title="Dampak Bisnis" icon={<Activity size={18} />}>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <SummaryBox label="Reminder terkirim/copy" value={String(metrics.sentReminders)} />
+                    <SummaryBox label="Saran menunggu" value={String(metrics.pendingRecommendations)} />
+                    <SummaryBox label="Nilai HO aktif" value={formatCurrency(metrics.activeHotlineValue)} />
+                    <SummaryBox label="Omzet converted" value={formatCurrency(metrics.convertedRevenue)} />
+                  </div>
+                </Panel>
+              </section>
+              <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
                 <Panel title="Prioritas Reminder" icon={<Bell size={18} />}>
                   <div className="grid gap-2">
                     {data.reminders.slice(0, 4).map((reminder) => (
@@ -458,6 +513,39 @@ export default function HomePage() {
               ) : null}
               <ParsedHotlineList rows={parsedHotlines} onChange={updateParsedHotline} onSave={saveParsedHotlines} />
             </div>
+            </Panel>
+          ) : null}
+
+          {activeView === "followup" ? (
+            <Panel title="Greensys Sync Helper" icon={<Upload size={18} />}>
+              <div className="grid gap-3">
+                <label className="grid gap-2 text-sm font-medium text-ink">
+                  Upload CSV/XML/TXT Greensys
+                  <input
+                    className="focus-ring min-h-10 rounded-md border border-line bg-white px-3 py-2 text-sm shadow-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white"
+                    type="file"
+                    accept=".csv,.xml,.txt"
+                    onChange={(event) => void importGreensysFile(event.target.files?.[0] ?? null)}
+                  />
+                </label>
+                {greensysFileName ? <p className="text-xs font-semibold text-slate-500">File: {greensysFileName}</p> : null}
+                <div className="grid gap-2">
+                  {greensysRows.map((row) => (
+                    <article key={row.id} className="rounded-md border border-line bg-slate-50 p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold">{row.customer_name || "-"}</p>
+                          <p className="text-xs text-slate-500">{row.phone_number || "-"} / {row.vehicle_info || row.plate_number || "-"}</p>
+                        </div>
+                        <button className="focus-ring rounded-md bg-brand px-3 py-2 text-xs font-semibold text-white shadow-sm" onClick={() => useGreensysRow(row)}>
+                          Pakai ke WO
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                  {!greensysRows.length ? <EmptyState text="Belum ada preview Greensys. Upload file atau input WO manual." /> : null}
+                </div>
+              </div>
             </Panel>
           ) : null}
 
@@ -643,6 +731,10 @@ export default function HomePage() {
                     <button className="focus-ring min-h-9 rounded-md bg-brand px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-teal-800" onClick={() => copyReminder(reminder)}>
                       Copy Pesan
                     </button>
+                    <a className="focus-ring inline-flex min-h-9 items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50" href={getWhatsAppUrl(reminder)} target="_blank" rel="noreferrer">
+                      <Send size={14} />
+                      Buka WA
+                    </a>
                     <select className="focus-ring rounded-md border border-line bg-white px-2 py-1 text-xs shadow-sm" value={reminder.status} onChange={(event) => updateReminder(reminder.id, event.target.value as ReminderStatus)}>
                       {reminderStatuses.map((status) => (
                         <option key={status}>{status}</option>
@@ -666,6 +758,11 @@ export default function HomePage() {
               </a>
             </div>
             <p className="mt-3 text-sm font-semibold">Total periode: {formatCurrency(monthlyTotal)}</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <SummaryBox label="Jumlah item" value={String(monthlyOrders.length)} />
+              <SummaryBox label="Rata-rata harga" value={formatCurrency(monthlyOrders.length ? Math.round(monthlyTotal / monthlyOrders.length) : 0)} />
+              <SummaryBox label="Converted periode" value={String(monthlyOrders.filter((order) => order.status === "Converted").length)} />
+            </div>
             <div className="mt-3 grid gap-3 md:hidden">
               {monthlyOrders.map((order, index) => (
                 <article key={order.id} className="rounded-md border border-line bg-slate-50 p-3">
@@ -909,9 +1006,17 @@ function ConfirmDeleteDialog({
 function TemplateEditor({ name, body, onSave }: { name: string; body: string; onSave: (body: string) => void }) {
   const [draft, setDraft] = useState(body);
   useEffect(() => setDraft(body), [body]);
+  const placeholders = ["{{nama_konsumen}}", "{{no_po_dealer}}", "{{nama_part}}", "{{no_part}}", "{{eta}}", "{{status}}", "{{rekomendasi_mekanik}}", "{{tanggal_follow_up}}"];
   return (
     <div className="rounded-md border border-line bg-slate-50 p-3">
       <p className="mb-2 text-sm font-semibold">{name}</p>
+      <div className="mb-2 flex flex-wrap gap-1">
+        {placeholders.map((placeholder) => (
+          <button key={placeholder} className="focus-ring rounded-full border border-line bg-white px-2 py-1 text-[11px] font-semibold text-slate-600" onClick={() => setDraft(`${draft}${draft.endsWith(" ") || !draft ? "" : " "}${placeholder}`)}>
+            {placeholder}
+          </button>
+        ))}
+      </div>
       <textarea className="focus-ring min-h-24 w-full rounded-md border border-line bg-white p-3 text-sm leading-6 shadow-inner" value={draft} onChange={(event) => setDraft(event.target.value)} />
       <button className="focus-ring mt-2 min-h-9 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50" onClick={() => onSave(draft)}>
         Simpan Template
@@ -1001,6 +1106,80 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <span className="min-w-0 break-words font-medium text-ink">{value}</span>
     </div>
   );
+}
+
+function parseGreensysPreview(content: string): GreensysPreviewRow[] {
+  const normalized = content.replace(/\r/g, "");
+  const rows = normalized
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (normalized.trim().startsWith("<")) {
+    const parser = new DOMParser();
+    const document = parser.parseFromString(normalized, "text/xml");
+    const candidates = Array.from(document.querySelectorAll("row, item, record, transaksi, service, wo"));
+    return candidates
+      .map((node, index) => ({
+        id: `xml-${index}`,
+        customer_name: getXmlValue(node, ["nama_konsumen", "customer_name", "nama", "konsumen"]),
+        phone_number: normalizePhone(getXmlValue(node, ["no_tlp", "phone_number", "telepon", "hp"])),
+        vehicle_info: getXmlValue(node, ["vehicle_info", "tipe_motor", "kendaraan", "motor"]),
+        plate_number: getXmlValue(node, ["nomor_polisi", "nopol", "plate_number"])
+      }))
+      .filter((row) => row.customer_name || row.phone_number || row.vehicle_info)
+      .slice(0, 30);
+  }
+
+  const header = splitDelimitedRow(rows[0] ?? "");
+  const dataRows = rows.slice(header.length > 1 ? 1 : 0);
+  return dataRows
+    .map((line, index) => {
+      const values = splitDelimitedRow(line);
+      const byHeader = (keys: string[]) => getDelimitedValue(header, values, keys);
+      return {
+        id: `csv-${index}`,
+        customer_name: byHeader(["nama konsumen", "customer", "nama", "konsumen"]) || values[0] || "",
+        phone_number: normalizePhone(byHeader(["no tlp", "telepon", "phone", "hp"]) || values.find((value) => /08\d{8,}|628\d{8,}/.test(value)) || ""),
+        vehicle_info: byHeader(["tipe motor", "kendaraan", "vehicle", "motor"]) || "",
+        plate_number: byHeader(["nomor polisi", "nopol", "plate"]) || ""
+      };
+    })
+    .filter((row) => row.customer_name || row.phone_number || row.vehicle_info || row.plate_number)
+    .slice(0, 30);
+}
+
+function splitDelimitedRow(line: string) {
+  const delimiter = line.includes("\t") ? "\t" : line.includes(";") ? ";" : ",";
+  return line.split(delimiter).map((value) => value.trim().replace(/^"|"$/g, ""));
+}
+
+function getDelimitedValue(headers: string[], values: string[], keys: string[]) {
+  const normalizedHeaders = headers.map((header) => header.toLowerCase());
+  const index = normalizedHeaders.findIndex((header) => keys.some((key) => header.includes(key)));
+  return index >= 0 ? values[index] ?? "" : "";
+}
+
+function getXmlValue(node: Element, keys: string[]) {
+  for (const key of keys) {
+    const direct = node.querySelector(key);
+    if (direct?.textContent) {
+      return direct.textContent.trim();
+    }
+    const attr = node.getAttribute(key);
+    if (attr) {
+      return attr.trim();
+    }
+  }
+  return "";
+}
+
+function normalizePhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("0")) {
+    return `62${digits.slice(1)}`;
+  }
+  return digits;
 }
 
 function Metric({ icon, label, value, tone }: { icon: ReactNode; label: string; value: string; tone: "brand" | "amber" | "slate" | "blue" | "green" }) {
