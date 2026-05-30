@@ -40,6 +40,7 @@ const hotlineStatuses: HotlineStatus[] = ["Booked", "Arrived", "Followed Up", "C
 const reminderStatuses: ReminderStatus[] = ["pending", "copied", "followed_up", "converted", "cancelled"];
 
 type AppView = "dashboard" | "hotline" | "followup" | "rekap";
+type PendingDelete = { type: "hotline" | "recommendation"; id: number; label: string } | null;
 
 const navigationItems: Array<{ id: AppView; label: string; shortLabel: string; icon: ReactNode }> = [
   { id: "dashboard", label: "Dashboard", shortLabel: "Home", icon: <Gauge size={18} /> },
@@ -103,6 +104,7 @@ export default function HomePage() {
   const [hotlineEditForm, setHotlineEditForm] = useState<HotlineOrderInput>(emptyHotline);
   const [editingRecommendationId, setEditingRecommendationId] = useState<number | null>(null);
   const [recommendationEditForm, setRecommendationEditForm] = useState<MechanicRecommendationInput>(emptyRecommendation);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
   const [month, setMonth] = useState(todayISO().slice(0, 7));
   const [activeView, setActiveView] = useState<AppView>("dashboard");
 
@@ -247,9 +249,6 @@ export default function HomePage() {
   }
 
   async function deleteHotline(id: number) {
-    if (!window.confirm("Hapus Hotline Order ini? Reminder terkait juga akan dihapus.")) {
-      return;
-    }
     const response = await fetch(`/api/hotline-orders?id=${id}`, { method: "DELETE" });
     const result = await response.json();
     if (!response.ok) {
@@ -303,9 +302,6 @@ export default function HomePage() {
   }
 
   async function deleteRecommendationItem(id: number) {
-    if (!window.confirm("Hapus saran mekanik ini? Reminder terkait juga akan dihapus.")) {
-      return;
-    }
     const response = await fetch(`/api/mechanic-recommendations?id=${id}`, { method: "DELETE" });
     const result = await response.json();
     if (!response.ok) {
@@ -314,6 +310,19 @@ export default function HomePage() {
     }
     setFeedback("Saran mekanik dihapus.");
     await loadData();
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) {
+      return;
+    }
+    const target = pendingDelete;
+    setPendingDelete(null);
+    if (target.type === "hotline") {
+      await deleteHotline(target.id);
+      return;
+    }
+    await deleteRecommendationItem(target.id);
   }
 
   async function copyReminder(reminder: ReminderTask) {
@@ -493,7 +502,7 @@ export default function HomePage() {
                           <Edit3 size={14} />
                           Edit
                         </button>
-                        <button className="focus-ring inline-flex min-h-9 items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 shadow-sm" onClick={() => deleteRecommendationItem(recommendation.id)}>
+                        <button className="focus-ring inline-flex min-h-9 items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 shadow-sm" onClick={() => setPendingDelete({ type: "recommendation", id: recommendation.id, label: recommendation.customer_name })}>
                           <Trash2 size={14} />
                           Hapus
                         </button>
@@ -544,7 +553,7 @@ export default function HomePage() {
                       <Edit3 size={14} />
                       Edit
                     </button>
-                    <button className="focus-ring inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 shadow-sm" onClick={() => deleteHotline(order.id)}>
+                    <button className="focus-ring inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 shadow-sm" onClick={() => setPendingDelete({ type: "hotline", id: order.id, label: order.customer_name })}>
                       <Trash2 size={14} />
                       Hapus
                     </button>
@@ -600,7 +609,7 @@ export default function HomePage() {
                             <Edit3 size={14} />
                             Edit
                           </button>
-                          <button className="focus-ring inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 shadow-sm" onClick={() => deleteHotline(order.id)}>
+                          <button className="focus-ring inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 shadow-sm" onClick={() => setPendingDelete({ type: "hotline", id: order.id, label: order.customer_name })}>
                             <Trash2 size={14} />
                             Hapus
                           </button>
@@ -723,6 +732,7 @@ export default function HomePage() {
         </div>
       </div>
 
+      <ConfirmDeleteDialog pendingDelete={pendingDelete} onCancel={() => setPendingDelete(null)} onConfirm={confirmDelete} />
       <BottomNavigation activeView={activeView} onChange={setActiveView} />
     </main>
   );
@@ -851,6 +861,46 @@ function RecommendationEditForm({
         <button className="focus-ring min-h-10 rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm" onClick={onCancel}>
           Batal
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDeleteDialog({
+  pendingDelete,
+  onCancel,
+  onConfirm
+}: {
+  pendingDelete: PendingDelete;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  if (!pendingDelete) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/40 px-4">
+      <div className="w-full max-w-sm rounded-md border border-line bg-white p-4 shadow-xl">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-red-50 text-red-700">
+            <Trash2 size={20} />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-ink">Hapus data?</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              Data <span className="font-semibold text-ink">{pendingDelete.label}</span> dan reminder terkait akan dihapus.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button className="focus-ring min-h-10 rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm" onClick={onCancel}>
+            Batal
+          </button>
+          <button className="focus-ring min-h-10 rounded-md border border-red-200 bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700" onClick={onConfirm}>
+            Hapus
+          </button>
+        </div>
       </div>
     </div>
   );
