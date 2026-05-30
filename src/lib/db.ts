@@ -44,14 +44,16 @@ export async function getAppData(): Promise<AppData> {
   throwIfError(recommendations.error);
   throwIfError(reminders.error);
   throwIfError(templates.error);
-  throwIfError(whatsappLogs.error);
+  if (whatsappLogs.error && !isMissingRelationError(whatsappLogs.error)) {
+    throwIfError(whatsappLogs.error);
+  }
 
   return {
     hotlines: ((hotlines.data ?? []) as HotlineOrder[]).map(normalizeHotlineRow),
     recommendations: (recommendations.data ?? []) as MechanicRecommendation[],
     reminders: (reminders.data ?? []) as ReminderTask[],
     templates: (templates.data ?? []) as MessageTemplate[],
-    whatsapp_logs: ((whatsappLogs.data ?? []) as WhatsappMessageLog[]).map(normalizeWhatsappLogRow)
+    whatsapp_logs: whatsappLogs.error ? [] : ((whatsappLogs.data ?? []) as WhatsappMessageLog[]).map(normalizeWhatsappLogRow)
   };
 }
 
@@ -490,6 +492,10 @@ function throwIfError(error: { message?: string } | null) {
   if (error) {
     throw new Error(error.message ?? "Supabase request failed.");
   }
+}
+
+function isMissingRelationError(error: { message?: string } | null) {
+  return Boolean(error?.message?.includes("does not exist") || error?.message?.includes("Could not find the table"));
 }
 
 function nextMonthISO(month: string) {
