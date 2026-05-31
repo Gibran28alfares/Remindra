@@ -35,10 +35,18 @@ jobs:
         run: |
           gcloud auth configure-docker gcr.io
 
-      - name: Build Docker image
-        run: |
-          docker build -t gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest .
-          docker tag gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+      - name: Debug Dockerfile
+         run: |
+              pwd
+              ls -la
+              echo "===== Dockerfile used by GitHub Actions ====="
+              cat Dockerfile
+              echo "===== Search next.config.js ====="
+              grep -R "next.config.js" . || true
+
+      - - name: Build Docker image
+              run: |
+                docker build --no-cache -f Dockerfile -t gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest .
 
       - name: Push Docker image
         run: |
