@@ -31,8 +31,12 @@ RUN npm ci --only=production
 
 # Copy built app from builder
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.mjs ./next.config.mjs
+
+# Copy Next.js config (supports both .js and .mjs)
+COPY --from=builder /app/next.config.* ./
+
+# Copy public directory if it exists, otherwise create empty one
+COPY --from=builder /app/public ./public 2>/dev/null || mkdir -p ./public
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
