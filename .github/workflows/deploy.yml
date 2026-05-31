@@ -15,6 +15,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       id-token: write
@@ -33,20 +34,35 @@ jobs:
 
       - name: Configure Docker for Google Cloud
         run: |
-          gcloud auth configure-docker gcr.io
+          gcloud auth configure-docker gcr.io --quiet
 
-      - name: Debug Dockerfile
-         run: |
-              pwd
-              ls -la
-              echo "===== Dockerfile used by GitHub Actions ====="
-              cat Dockerfile
-              echo "===== Search next.config.js ====="
-              grep -R "next.config.js" . || true
+      - name: Debug project files
+        run: |
+          echo "Current directory:"
+          pwd
+
+          echo "Root files:"
+          ls -la
+
+          echo "Dockerfile:"
+          cat Dockerfile
+
+          echo "Next config search:"
+          find . -name "next.config.*" -maxdepth 3
+
+          echo "Dockerignore:"
+          if [ -f .dockerignore ]; then
+            cat .dockerignore
+          else
+            echo "No .dockerignore found"
+          fi
 
       - name: Build Docker image
-              run: |
-                docker build --no-cache -f Dockerfile -t gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest .
+        run: |
+          docker build --no-cache -f Dockerfile \
+            -t gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest \
+            -t gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            .
 
       - name: Push Docker image
         run: |
@@ -69,12 +85,16 @@ jobs:
 
       - name: Get deployed service URL
         run: |
-          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format='value(status.url)' --project ${{ env.PROJECT_ID }})
-          echo "🚀 Deployed to: $URL"
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --format="value(status.url)" \
+            --project ${{ env.PROJECT_ID }})
+
+          echo "Deployed to: $URL"
 
       - name: Print deployment info
         run: |
-          echo "✅ Deployment completed!"
+          echo "Deployment completed!"
           echo "Service: ${{ env.SERVICE_NAME }}"
           echo "Region: ${{ env.REGION }}"
           echo "Project: ${{ env.PROJECT_ID }}"
