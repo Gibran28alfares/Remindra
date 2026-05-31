@@ -36,7 +36,7 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/next.config.* ./
 
 # Copy public directory if it exists, otherwise create empty one
-COPY --from=builder /app/public ./public 2>/dev/null || mkdir -p ./public
+#COPY --from=builder /app/public ./public 2>/dev/null || mkdir -p ./public
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
