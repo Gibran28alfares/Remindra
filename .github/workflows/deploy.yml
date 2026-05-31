@@ -44,7 +44,7 @@ jobs:
               echo "===== Search next.config.js ====="
               grep -R "next.config.js" . || true
 
-      - - name: Build Docker image
+      - name: Build Docker image
               run: |
                 docker build --no-cache -f Dockerfile -t gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest .
 
