@@ -20,6 +20,7 @@
    - `WHATSAPP_GRAPH_API_VERSION`
    - `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
 4. Deploy.
+5. Use the generated Vercel production URL as the REMINDRA application URL.
 
 ## 3. WhatsApp Cloud API
 
@@ -34,5 +35,6 @@ Open the Vercel production URL from the smartphone browser and login with the Su
 ## Notes
 
 - Parser V2 remains deterministic and non-AI for v1.
-- WhatsApp is copy-message only; auto-send is roadmap.
+- WhatsApp supports manual copy/open fallback and Cloud API send when its environment variables are configured.
 - SQLite is no longer used for cloud v1.
+- Vercel is the official deployment target for REMINDRA cloud v1.
